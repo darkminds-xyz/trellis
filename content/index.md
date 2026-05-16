@@ -1,18 +1,9 @@
 ---
-title: "Digital Gardening for Your Mind"
 tags:
-  - the
+  - Æther
   - Quick
 ---
 
-# :potted_plant: Welcome to Trellis
+# The Æther of my explorations, creativity, and art...
 
-A garden for your mind? Don't mind if I do.. :herb:
-
-- ### [Setup Guide](./setup-guide)
-- ### [Publishing to the World Wide Web](./hosting)
-- ### [Roadmap and Changelog](./roadmap-and-changelog)
-
-## Features
-
-- ### [The Mother of All Kitchen Sinks](./test/kitchen-sink)
+I'm a wannabe polymath interested in technology and various other oddities. You have stumbled upon a garden of my mind. Expect to leave more troubled than when you came in.
