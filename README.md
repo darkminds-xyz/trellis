@@ -3,9 +3,8 @@
 > The greatest service which can be rendered any country is to add a useful plant to its culture.
 > ~ Thomas Jefferson
 
-Trellis is an open source toolchain and server that helps you publish Markdown notes as a [**digital garden**](https://medium.com/%40raysims/a-digital-garden-inventory-d6450fe74b4). Fast, opinionated, and built for long-lived knowledge rather than disposable posts. Trellis is currently pre-alpha but developing quickly, we're looking for early tester and new ideas for the digital gardens world.
+Trellis is an open source toolchain and server that helps you publish Markdown notes as a [**digital garden**](https://medium.com/%40raysims/a-digital-garden-inventory-d6450fe74b4). Fast, opinionated, and built for long-lived knowledge rather than disposable posts. Trellis is currently pre-alpha and developing slowly, we're looking for early testers and new ideas for the digital gardens world.
 
-<!-- Read the documentation to get started today: https://trellis.studium.dev/ -->
 
 ## Trellis: Resources
 
@@ -18,11 +17,11 @@ Learn more about Trellis:
 ### Thank you Quartz Creators!
 
 Quartz is the original inspiration and the author(s) of lots of styling and HTML code found in this project.
-Check them out to learn who/what inspired me to build the Rust version: https://github.com/jackyzha0/quartz
+Check them out to learn who/what inspired me to build a Rust version with a slightly different philosophy: https://github.com/jackyzha0/quartz
 
 ## Latest Release
 
-### Version 0.25.0
+### Version 0.26.0
 
 > You can't put a price tag on preparation.
 

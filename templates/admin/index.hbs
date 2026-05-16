@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{site.name}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="{{fonts_href}}" rel="stylesheet" />
+    <style>
+      {{{styles}}}
+    </style>
+    <script>
+      var trellisEditor = {{{markdown_json}}}
+    </script>
+  </head>
+  <body data-slug="{{article.slug}}">
+    <div id="trellis-root" class="page">
+      <div id="trellis-body">
+        <aside class="left sidebar">
+          <div class="page-header">
+            <a href="/">
+              <h1 class="page-title">{{site.name}}</h1>
+            </a>
+            {{#if site.tagline}}
+              <p>{{site.tagline}}</p>
+            {{/if}}
+          </div>
+
+          {{> components/explorer}}
+        </aside>
+
+        <main class="center">
+          <article>
+            <header class="page-header">
+              <h1 class="page-title">{{article.title}}</h1>
+              <p class="content-meta">
+                {{#if article.created}}
+                  <span>Created: {{article.created}}</span>
+                  ·
+                {{/if}}
+                {{#if article.updated}}
+                  <span>Updated: {{article.updated}}</span>
+                  ·
+                {{/if}}
+                <span>{{article.read_time}}</span>
+              </p>
+            </header>
+            {{> taglist}}
+            <section class="page-content">
+              <button id="toggle">
+                toggle
+              </button>
+              <div id="trellis-editor"> </div>
+            </section>
+          </article>
+          <footer>
+            <p>Created with
+              <a href="https://trellis.studium.dev/">Trellis v{{footer.version}}</a>
+              ©
+              {{footer.year}}</p>
+            {{#if footer.links}}
+              <ul>
+                {{#each footer.links}}
+                  <li><a href="{{href}}">{{text}}</a></li>
+                {{/each}}
+              </ul>
+            {{/if}}
+          </footer>
+        </main>
+
+        <aside class="right sidebar">
+          {{> components/graph}}
+          {{> components/backlinks}}
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/static/editor.js"></script>
+  </body>
+</html>
