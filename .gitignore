@@ -3,3 +3,4 @@ static/
 .build/
 trellis.db
 .env
+nginx/
