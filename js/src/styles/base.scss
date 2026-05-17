@@ -34,8 +34,9 @@ body {
   border-radius: 5px;
 }
 ::selection {
-  background: color-mix(in srgb, var(--tertiary) 60%, rgba(255, 255, 255, 0));
-  color: var(--darkgray);
+  background: Highlight;
+  color: HighlightText;
+  text-shadow: none;
 }
 
 p,
@@ -68,6 +69,9 @@ path[class~="typst-shape"] {
 }
 
 article {
+  user-select: text;
+  -webkit-user-select: text;
+
   > mjx-container.MathJax,
   blockquote > div > mjx-container.MathJax {
     display: flex;
@@ -80,6 +84,16 @@ article {
     margin-top: 1rem;
     margin-bottom: 1rem;
   }
+}
+
+.page-content,
+.page-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.page-content :is(a, img) {
+  -webkit-user-drag: none;
 }
 
 strong {
