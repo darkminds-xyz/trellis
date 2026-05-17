@@ -14,7 +14,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     WebTemplates,
-    auth::AdminSessions,
+    auth::{AdminLoginLimiter, AdminSessions},
     schemas::{accounts, documents},
     typography::Typography,
 };
@@ -51,7 +51,7 @@ pub async fn admin_list(
     sessions: web::Data<AdminSessions>,
     query: web::Query<AdminQuery>,
 ) -> impl Responder {
-    if sessions.is_authenticated(&req) {
+    if sessions.is_authenticated(&req).await {
         return render_admin_list(hb, pool, query.into_inner()).await;
     }
 
@@ -75,7 +75,7 @@ pub async fn edit_document(
     let post_id = post_id.into_inner();
     let next = format!("/admin/edit/{post_id}");
 
-    if !sessions.is_authenticated(&req) {
+    if !sessions.is_authenticated(&req).await {
         let has_admin = match accounts::has_admin(&pool).await {
             Ok(has_admin) => has_admin,
             Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
@@ -95,7 +95,7 @@ pub async fn import_vault(
     sessions: web::Data<AdminSessions>,
     query: web::Query<AdminQuery>,
 ) -> impl Responder {
-    if sessions.is_authenticated(&req) {
+    if sessions.is_authenticated(&req).await {
         return render_admin_import(hb, query.into_inner());
     }
 
@@ -109,10 +109,22 @@ pub async fn import_vault(
 
 #[post("/admin/login")]
 pub async fn login(
+    req: HttpRequest,
     form: web::Form<LoginForm>,
     pool: web::Data<SqlitePool>,
     sessions: web::Data<AdminSessions>,
+    login_limiter: web::Data<AdminLoginLimiter>,
 ) -> impl Responder {
+    let login_key = admin_login_limit_key(&req, &form.username);
+
+    if !login_limiter.is_allowed(&login_key) {
+        return HttpResponse::new(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    let Some(_verification_slot) = login_limiter.try_acquire_verification() else {
+        return HttpResponse::new(StatusCode::TOO_MANY_REQUESTS);
+    };
+
     let is_authenticated = match accounts::authenticate(&pool, &form.username, &form.password).await
     {
         Ok(is_authenticated) => is_authenticated,
@@ -120,22 +132,31 @@ pub async fn login(
     };
 
     if !is_authenticated {
+        login_limiter.record_failure(&login_key);
         let next = sanitize_admin_next(form.next.as_deref());
         return redirect(&admin_url(&next, Some("invalid")));
     }
 
+    login_limiter.record_success(&login_key);
     let next = sanitize_admin_next(form.next.as_deref());
+    let session_cookie = match sessions.create_session_cookie().await {
+        Ok(cookie) => cookie,
+        Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+
     HttpResponse::SeeOther()
         .insert_header((header::LOCATION, next))
-        .cookie(sessions.create_session_cookie())
+        .cookie(session_cookie)
         .finish()
 }
 
 #[post("/admin/logout")]
 pub async fn logout(req: HttpRequest, sessions: web::Data<AdminSessions>) -> impl Responder {
+    let clear_cookie = sessions.clear_session_cookie(&req).await;
+
     HttpResponse::SeeOther()
         .insert_header((header::LOCATION, "/admin"))
-        .cookie(sessions.clear_session_cookie(&req))
+        .cookie(clear_cookie)
         .finish()
 }
 
@@ -150,7 +171,7 @@ pub async fn save_document(
     let post_id = post_id.into_inner();
     let edit_path = format!("/admin/edit/{post_id}");
 
-    if !sessions.is_authenticated(&req) {
+    if !sessions.is_authenticated(&req).await {
         return redirect(&edit_path);
     }
 
@@ -160,7 +181,8 @@ pub async fn save_document(
 
     let doc_id = if post_id > 0 { Some(post_id) } else { None };
     match documents::save(&pool, doc_id, &form.doc).await {
-        Ok(doc_id) => redirect(&format!("/admin/edit/{doc_id}?saved=1")),
+        Ok(Some(doc_id)) => redirect(&format!("/admin/edit/{doc_id}?saved=1")),
+        Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
         Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
@@ -171,7 +193,7 @@ pub async fn upload_vault(
     mut payload: Multipart,
     sessions: web::Data<AdminSessions>,
 ) -> impl Responder {
-    if !sessions.is_authenticated(&req) {
+    if !sessions.is_authenticated(&req).await {
         return redirect("/admin/import");
     }
 
@@ -418,6 +440,16 @@ fn sanitize_admin_next(next: Option<&str>) -> String {
     next.filter(|next| next.starts_with("/admin") && !next.starts_with("//"))
         .unwrap_or("/admin/list")
         .to_string()
+}
+
+fn admin_login_limit_key(req: &HttpRequest, username: &str) -> String {
+    let remote_addr = req
+        .peer_addr()
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    let username = username.trim().to_ascii_lowercase();
+
+    format!("{remote_addr}:{username}")
 }
 
 fn document_label(id: i64, index_doc_id: Option<i64>) -> String {

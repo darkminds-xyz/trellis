@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token TEXT PRIMARY KEY NOT NULL,
+  expires_at INTEGER NOT NULL
+);
