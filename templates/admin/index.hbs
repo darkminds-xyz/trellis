@@ -3,18 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{site.name}}</title>
+    <title>Admin · {{site.name}}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="{{fonts_href}}" rel="stylesheet" />
     <style>
       {{{styles}}}
+      {{{editor_styles}}}
+      {{{font_css}}}
     </style>
     <script>
-      var trellisEditor = {{{markdown_json}}}
+      var trellisEditor = {{{draft_json}}};
     </script>
   </head>
-  <body data-slug="{{article.slug}}">
+  <body data-slug="admin">
     <div id="trellis-root" class="page">
       <div id="trellis-body">
         <aside class="left sidebar">
@@ -22,59 +24,147 @@
             <a href="/">
               <h1 class="page-title">{{site.name}}</h1>
             </a>
-            {{#if site.tagline}}
-              <p>{{site.tagline}}</p>
-            {{/if}}
           </div>
-
-          {{> components/explorer}}
         </aside>
 
         <main class="center">
           <article>
             <header class="page-header">
-              <h1 class="page-title">{{article.title}}</h1>
-              <p class="content-meta">
-                {{#if article.created}}
-                  <span>Created: {{article.created}}</span>
-                  ·
-                {{/if}}
-                {{#if article.updated}}
-                  <span>Updated: {{article.updated}}</span>
-                  ·
-                {{/if}}
-                <span>{{article.read_time}}</span>
-              </p>
+              <h1 class="page-title">Admin</h1>
+              <p class="content-meta">Private publishing tools</p>
             </header>
-            {{> taglist}}
+
             <section class="page-content">
-              <button id="toggle">
-                toggle
-              </button>
-              <div id="trellis-editor"> </div>
+              {{#if error}}
+                <p role="alert">{{error}}</p>
+              {{/if}}
+              {{#if uploaded}}
+                <p>{{uploaded}} upload item(s) received.</p>
+              {{/if}}
+              {{#if saved}}
+                <p>{{selected_doc_label}} saved.</p>
+              {{/if}}
+
+              {{#if is_import}}
+                <nav aria-label="Admin tools">
+                  <a href="/admin/list">Posts</a>
+                </nav>
+                <form action="/admin/import" method="post" enctype="multipart/form-data">
+                  <h2>Import vault</h2>
+                  <p>Upload an Obsidian vault zip or select Markdown, image, and related asset files.</p>
+                  <label>
+                    Vault zip
+                    <input type="file" name="vault_zip" accept=".zip,application/zip" />
+                  </label>
+                  <label>
+                    Vault files
+                    <input type="file" name="vault_files" multiple webkitdirectory />
+                  </label>
+                  <label>
+                    Additional files
+                    <input type="file" name="files" multiple accept=".md,.markdown,image/*,.pdf,.txt" />
+                  </label>
+                  <button type="submit">Upload</button>
+                </form>
+              {{/if}}
+
+              {{#if is_list}}
+                {{#if has_posts}}
+                  <section class="admin-posts" aria-label="Posts">
+                    <h2>Posts</h2>
+                    <ul>
+                      {{#each posts}}
+                        <li>
+                          <a
+                            class="admin-post-link{{#if selected}} selected{{/if}}"
+                            href="/admin/edit/{{id}}"
+                            {{#if selected}}aria-current="page"{{/if}}
+                          >
+                            <span>{{label}}</span>
+                            <small>{{title}}</small>
+                          </a>
+                        </li>
+                      {{/each}}
+                    </ul>
+                  </section>
+                {{else}}
+                  <section class="admin-posts" aria-label="Posts">
+                    <h2>Posts</h2>
+                    <p>No posts yet.</p>
+                  </section>
+                {{/if}}
+              {{/if}}
+
+              {{#if is_edit}}
+                <nav aria-label="Admin tools">
+                  <a href="/admin/list">Posts</a>
+                </nav>
+                <form action="/admin/edit/{{#if selected_doc_id}}{{selected_doc_id}}{{else}}0{{/if}}" method="post">
+                  <div class="admin-editor-header">
+                    <h2>
+                      {{#if selected_doc_label}}
+                        Edit {{selected_doc_label}}
+                      {{else}}
+                        Write first post
+                      {{/if}}
+                    </h2>
+                    <button
+                      type="button"
+                      class="admin-editor-toggle"
+                      data-trellis-source-toggle
+                      aria-label="Toggle Markdown source"
+                      aria-pressed="false"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="icon icon-tabler icons-tabler-outline icon-tabler-code"
+                        aria-hidden="true"
+                      >
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M7 8l-4 4l4 4" />
+                        <path d="M17 8l4 4l-4 4" />
+                        <path d="M14 4l-4 16" />
+                      </svg>
+                    </button>
+                  </div>
+                  <input type="hidden" name="doc" value="{{draft}}" data-trellis-editor-source />
+                  <div id="trellis-editor" data-trellis-editor-view="prosemark"></div>
+                  <textarea
+                    class="admin-source-editor"
+                    rows="16"
+                    data-trellis-source-view
+                    hidden
+                  >{{draft}}</textarea>
+                  <button type="submit">
+                    {{#if selected_doc_label}}
+                      Save {{selected_doc_label}}
+                    {{else}}
+                      Publish index.md
+                    {{/if}}
+                  </button>
+                </form>
+              {{/if}}
+
+              <form action="/admin/logout" method="post">
+                <button type="submit">Sign out</button>
+              </form>
             </section>
           </article>
-          <footer>
-            <p>Created with
-              <a href="https://trellis.studium.dev/">Trellis v{{footer.version}}</a>
-              ©
-              {{footer.year}}</p>
-            {{#if footer.links}}
-              <ul>
-                {{#each footer.links}}
-                  <li><a href="{{href}}">{{text}}</a></li>
-                {{/each}}
-              </ul>
-            {{/if}}
-          </footer>
         </main>
 
-        <aside class="right sidebar">
-          {{> components/graph}}
-          {{> components/backlinks}}
-        </aside>
+        <aside class="right sidebar"></aside>
       </div>
     </div>
-    <script type="module" src="/static/editor.js"></script>
+    {{#if is_edit}}
+      <script type="module" src="/static/editor.js"></script>
+    {{/if}}
   </body>
 </html>

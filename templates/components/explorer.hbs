@@ -61,12 +61,18 @@
                 >
                   <ul style="padding-left: 1.4rem">
                     {{#each children}}
-                      <li><a href="/{{path}}">{{title}}</a></li>
+                    <li><a
+                        href="/{{path}}"
+                        {{#if active}}aria-current="page"{{/if}}
+                      >{{title}}</a></li>
                     {{/each}}
                   </ul>
                 </div>
               {{else}}
-                <a href="/{{path}}">{{title}}</a>
+                <a
+                  href="/{{path}}"
+                  {{#if active}}aria-current="page"{{/if}}
+                >{{title}}</a>
               {{/if}}
             </li>
           {{/each}}
@@ -167,7 +173,11 @@
               <div class="folder-outer{{#if open}} open{{/if}}">
                 <ul class="content">
                   {{#each children}}
-                    <li><a class="internal" href="/{{path}}">{{title}}</a></li>
+                    <li><a
+                        class="internal{{#if active}} active{{/if}}"
+                        href="/{{path}}"
+                        {{#if active}}aria-current="page"{{/if}}
+                      >{{title}}</a></li>
                   {{/each}}
                 </ul>
               </div>
@@ -177,7 +187,11 @@
 
         {{#each nav}}
           {{#unless children}}
-            <li><a class="internal" href="/{{path}}">{{title}}</a></li>
+            <li><a
+                class="internal{{#if active}} active{{/if}}"
+                href="/{{path}}"
+                {{#if active}}aria-current="page"{{/if}}
+              >{{title}}</a></li>
           {{/unless}}
         {{/each}}
       {{/if}}

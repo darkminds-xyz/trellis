@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS accounts (
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL
+);

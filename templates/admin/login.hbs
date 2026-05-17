@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin · {{site.name}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="{{fonts_href}}" rel="stylesheet" />
+    <style>
+      {{{styles}}}
+      {{{font_css}}}
+    </style>
+  </head>
+  <body data-slug="admin-login">
+    <div id="trellis-root" class="page">
+      <div id="trellis-body">
+        <aside class="left sidebar">
+          <div class="page-header">
+            <a href="/">
+              <h1 class="page-title">{{site.name}}</h1>
+            </a>
+          </div>
+        </aside>
+
+        <main class="center">
+          <article>
+            <header class="page-header">
+              <h1 class="page-title">Admin login</h1>
+              <p class="content-meta">Private access for site maintenance</p>
+            </header>
+
+            <section class="page-content">
+              {{#unless has_admin}}
+                <p role="alert">Admin credentials are not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD in .env and restart Trellis.</p>
+              {{/unless}}
+              {{#if error}}
+                <p role="alert">Invalid username or password.</p>
+              {{/if}}
+
+              <form action="/admin/login" method="post">
+                <input type="hidden" name="next" value="{{next}}" />
+                <label>
+                  Username
+                  <input name="username" autocomplete="username" required />
+                </label>
+                <label>
+                  Password
+                  <input name="password" type="password" autocomplete="current-password" required />
+                </label>
+                <button type="submit">Sign in</button>
+              </form>
+            </section>
+          </article>
+        </main>
+
+        <aside class="right sidebar"></aside>
+      </div>
+    </div>
+  </body>
+</html>

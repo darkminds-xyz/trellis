@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 actix-web = "4"
 actix-multipart = "0.7.2"
+anyhow = "1.0"
 confik = "0.15.1"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros"] }
 dotenvy = "0.15.7"
@@ -21,8 +22,11 @@ log = "0.4.27"
 regex = "1.11.1"
 reqwest = { version = "0.13.2", features = ["json"] }
 futures-util = "0.3.31"
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 tokio = { version = "1.43", features = ["full"] }
 actix-limitation = "0.5.1"
 handlebars = "6.3.2"
 notify = "8.2.0"
+rushdown = "0.18.0"
 rushdown-meta = "0.9.9"
+walkdir = "2.5.0"

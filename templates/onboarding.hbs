@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{article.title}} · {{site.name}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="{{fonts_href}}" rel="stylesheet" />
+    <style>
+      {{{styles}}}
+      {{{font_css}}}
+    </style>
+  </head>
+  <body data-slug="onboarding">
+    <div id="trellis-root" class="page">
+      <div id="trellis-body">
+        <aside class="left sidebar">
+          <div class="page-header">
+            <a href="/">
+              <h1 class="page-title">{{site.name}}</h1>
+            </a>
+            {{#if site.tagline}}
+              <p>{{site.tagline}}</p>
+            {{/if}}
+          </div>
+
+          {{> components/explorer}}
+        </aside>
+
+        <main class="center">
+          <article>
+            <header class="page-header">
+              <h1 class="page-title">Welcome to Trellis</h1>
+            </header>
+            <section class="page-content">
+              <p>No Markdown documents are available yet.</p>
+              <p>Start by importing an existing vault or writing the first post.</p>
+              <div>
+                <form action="/admin/import" method="get">
+                  <button type="submit">Import vault</button>
+                </form>
+                <form action="/admin/edit/0" method="get">
+                  <button type="submit">Write first post</button>
+                </form>
+              </div>
+            </section>
+          </article>
+          <footer>
+            <p>Created with
+              <a href="https://trellis.studium.dev/">Trellis v{{footer.version}}</a>
+              ©
+              {{footer.year}}</p>
+          </footer>
+        </main>
+
+        <aside class="right sidebar">
+          {{> components/graph}}
+          {{> components/backlinks}}
+        </aside>
+      </div>
+    </div>
+  </body>
+</html>
