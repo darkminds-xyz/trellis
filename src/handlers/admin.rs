@@ -353,7 +353,7 @@ fn admin_data(
         "nav": [],
         "explorer": {
             "id": "explorer",
-            "title": "Notes",
+            "title": "Xplorer",
             "use_saved_state": "true",
             "folder_click_behavior": "link",
             "folder_default_state": "collapsed",
