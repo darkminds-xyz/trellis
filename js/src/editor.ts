@@ -5,9 +5,9 @@ import {
   prosemarkBasicSetup,
   prosemarkBaseThemeSetup,
   prosemarkMarkdownSyntaxExtensions,
-} from "@prosemark/core";
+} from "@tmark/core";
 import { languages } from "@codemirror/language-data";
-import { htmlBlockExtension } from "@prosemark/render-html";
+import { htmlBlockExtension } from "@tmark/render-html";
 import { markdown } from "@codemirror/lang-markdown";
 import "./editor.css";
 
@@ -17,22 +17,22 @@ function boot() {
   const el = document.getElementById("trellis-editor");
   if (!el) return;
   const source = document.querySelector<HTMLInputElement>(
-    "[data-trellis-editor-source]",
+    "[data-trellis-editor-source]"
   );
   const sourceView = document.querySelector<HTMLTextAreaElement>(
-    "[data-trellis-source-view]",
+    "[data-trellis-source-view]"
   );
   const sourceToggle = document.querySelector<HTMLButtonElement>(
-    "[data-trellis-source-toggle]",
+    "[data-trellis-source-toggle]"
   );
   const form = document.querySelector<HTMLFormElement>(
-    "[data-trellis-editor-form]",
+    "[data-trellis-editor-form]"
   );
   const saveError = document.querySelector<HTMLElement>(
-    "[data-trellis-save-error]",
+    "[data-trellis-save-error]"
   );
   const submitButton = form?.querySelector<HTMLButtonElement>(
-    "button[type='submit']",
+    "button[type='submit']"
   );
   const initialDoc = trellisEditor ?? sourceView?.value ?? source?.value ?? "";
   // @ts-ignore
@@ -98,9 +98,10 @@ function boot() {
     const saveUrl = form.dataset.saveUrl;
     if (!saveUrl) return;
 
-    const markdown = sourceView && !sourceView.hidden
-      ? sourceView.value
-      : editor.state.doc.toString();
+    const markdown =
+      sourceView && !sourceView.hidden
+        ? sourceView.value
+        : editor.state.doc.toString();
     if (source) source.value = markdown;
 
     if (saveError) {
