@@ -39,7 +39,7 @@
                 <p role="alert">{{error}}</p>
               {{/if}}
               {{#if uploaded}}
-                <p>{{uploaded}} upload item(s) received.</p>
+                <p>{{uploaded}} image upload(s) stored.</p>
               {{/if}}
               {{#if saved}}
                 <p>{{selected_doc_label}} saved.</p>
@@ -50,22 +50,30 @@
                   <a href="/admin/list">Posts</a>
                 </nav>
                 <form action="/admin/import" method="post" enctype="multipart/form-data">
-                  <h2>Import vault</h2>
-                  <p>Upload an Obsidian vault zip or select Markdown, image, and related asset files.</p>
+                  <h2>Images</h2>
+                  <p>Upload images to compress, deduplicate, and store them in the database.</p>
                   <label>
-                    Vault zip
-                    <input type="file" name="vault_zip" accept=".zip,application/zip" />
-                  </label>
-                  <label>
-                    Vault files
-                    <input type="file" name="vault_files" multiple webkitdirectory />
-                  </label>
-                  <label>
-                    Additional files
-                    <input type="file" name="files" multiple accept=".md,.markdown,image/*,.pdf,.txt" />
+                    Image files
+                    <input type="file" name="files" multiple accept="image/*" />
                   </label>
                   <button type="submit">Upload</button>
                 </form>
+                {{#if has_images}}
+                  <section class="admin-posts" aria-label="Images">
+                    <h2>Stored images</h2>
+                    <ul>
+                      {{#each images}}
+                        <li>
+                          <div class="admin-post-link">
+                            <span>{{short_id}}</span>
+                            <small>{{mime}} - {{width}}x{{height}} - {{size_bytes}} bytes</small>
+                            <small>{{markdown}}</small>
+                          </div>
+                        </li>
+                      {{/each}}
+                    </ul>
+                  </section>
+                {{/if}}
               {{/if}}
 
               {{#if is_list}}
@@ -99,7 +107,7 @@
                 <nav aria-label="Admin tools">
                   <a href="/admin/list">Posts</a>
                 </nav>
-                <form action="/admin/edit/{{#if selected_doc_id}}{{selected_doc_id}}{{else}}0{{/if}}" method="post">
+                <form data-trellis-editor-form data-save-url="/admin/edit/{{#if selected_doc_id}}{{selected_doc_id}}{{else}}0{{/if}}">
                   <div class="admin-editor-header">
                     <h2>
                       {{#if selected_doc_label}}
@@ -135,7 +143,7 @@
                       </svg>
                     </button>
                   </div>
-                  <input type="hidden" name="doc" value="{{draft}}" data-trellis-editor-source />
+                  <input type="hidden" value="{{draft}}" data-trellis-editor-source />
                   <div id="trellis-editor" data-trellis-editor-view="prosemark"></div>
                   <textarea
                     class="admin-source-editor"
@@ -143,6 +151,7 @@
                     data-trellis-source-view
                     hidden
                   >{{draft}}</textarea>
+                  <p role="alert" data-trellis-save-error hidden></p>
                   <button type="submit">
                     {{#if selected_doc_label}}
                       Save {{selected_doc_label}}

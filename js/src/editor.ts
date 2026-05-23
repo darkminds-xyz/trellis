@@ -25,6 +25,15 @@ function boot() {
   const sourceToggle = document.querySelector<HTMLButtonElement>(
     "[data-trellis-source-toggle]",
   );
+  const form = document.querySelector<HTMLFormElement>(
+    "[data-trellis-editor-form]",
+  );
+  const saveError = document.querySelector<HTMLElement>(
+    "[data-trellis-save-error]",
+  );
+  const submitButton = form?.querySelector<HTMLButtonElement>(
+    "button[type='submit']",
+  );
   const initialDoc = trellisEditor ?? sourceView?.value ?? source?.value ?? "";
   // @ts-ignore
   const editor = new EditorView({
@@ -81,6 +90,56 @@ function boot() {
 
   sourceView?.addEventListener("input", () => {
     if (source) source.value = sourceView.value;
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const saveUrl = form.dataset.saveUrl;
+    if (!saveUrl) return;
+
+    const markdown = sourceView && !sourceView.hidden
+      ? sourceView.value
+      : editor.state.doc.toString();
+    if (source) source.value = markdown;
+
+    if (saveError) {
+      saveError.hidden = true;
+      saveError.textContent = "";
+    }
+    if (submitButton) submitButton.disabled = true;
+
+    try {
+      const response = await fetch(saveUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ doc: markdown }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = saveUrl;
+        return;
+      }
+
+      const body = await response.json().catch(() => undefined);
+      if (!response.ok) {
+        throw new Error(body?.message ?? "Unable to save document");
+      }
+
+      if (body?.edit_url) {
+        window.location.href = body.edit_url;
+      }
+    } catch (error) {
+      if (saveError) {
+        saveError.hidden = false;
+        saveError.textContent =
+          error instanceof Error ? error.message : "Unable to save document";
+      }
+      if (submitButton) submitButton.disabled = false;
+    }
   });
 
   return editor;

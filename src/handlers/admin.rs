@@ -15,7 +15,7 @@ use sqlx::SqlitePool;
 use crate::{
     WebTemplates,
     auth::{AdminLoginLimiter, AdminSessions},
-    schemas::{accounts, documents},
+    schemas::{accounts, documents, images},
     typography::Typography,
 };
 
@@ -34,7 +34,7 @@ pub struct LoginForm {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DraftForm {
+pub struct DraftPayload {
     doc: String,
 }
 
@@ -96,7 +96,7 @@ pub async fn import_vault(
     query: web::Query<AdminQuery>,
 ) -> impl Responder {
     if sessions.is_authenticated(&req).await {
-        return render_admin_import(hb, query.into_inner());
+        return render_admin_import(hb, pool, query.into_inner()).await;
     }
 
     let has_admin = match accounts::has_admin(&pool).await {
@@ -164,7 +164,7 @@ pub async fn logout(req: HttpRequest, sessions: web::Data<AdminSessions>) -> imp
 pub async fn save_document(
     req: HttpRequest,
     post_id: web::Path<i64>,
-    form: web::Form<DraftForm>,
+    payload: web::Json<DraftPayload>,
     pool: web::Data<SqlitePool>,
     sessions: web::Data<AdminSessions>,
 ) -> impl Responder {
@@ -172,16 +172,35 @@ pub async fn save_document(
     let edit_path = format!("/admin/edit/{post_id}");
 
     if !sessions.is_authenticated(&req).await {
-        return redirect(&edit_path);
+        return HttpResponse::Unauthorized().json(json!({
+            "error": "unauthorized",
+            "login_url": edit_path,
+        }));
     }
 
-    if form.doc.trim().is_empty() {
-        return redirect(&admin_url(&edit_path, Some("empty")));
+    if payload.doc.trim().is_empty() {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "empty",
+            "message": "Document cannot be empty.",
+        }));
     }
 
     let doc_id = if post_id > 0 { Some(post_id) } else { None };
-    match documents::save(&pool, doc_id, &form.doc).await {
-        Ok(Some(doc_id)) => redirect(&format!("/admin/edit/{doc_id}?saved=1")),
+    match documents::save(&pool, doc_id, &payload.doc).await {
+        Ok(Some(doc_id)) => {
+            if images::sync_document_images(&pool, doc_id, &payload.doc)
+                .await
+                .is_err()
+            {
+                return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+
+            HttpResponse::Ok().json(json!({
+                "id": doc_id,
+                "edit_url": format!("/admin/edit/{doc_id}?saved=1"),
+                "saved": true,
+            }))
+        }
         Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
         Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -192,33 +211,53 @@ pub async fn upload_vault(
     req: HttpRequest,
     mut payload: Multipart,
     sessions: web::Data<AdminSessions>,
+    pool: web::Data<SqlitePool>,
 ) -> impl Responder {
     if !sessions.is_authenticated(&req).await {
         return redirect("/admin/import");
     }
 
-    let mut file_count = 0usize;
+    let mut image_count = 0usize;
     while let Some(item) = payload.next().await {
         let Ok(mut field) = item else {
             return HttpResponse::new(StatusCode::BAD_REQUEST);
         };
 
-        let has_filename = field
+        let filename = field
             .content_disposition()
             .and_then(|disposition| disposition.get_filename())
-            .is_some();
-        if has_filename {
-            file_count += 1;
-        }
+            .map(str::to_string);
 
+        let mut bytes = Vec::new();
         while let Some(chunk) = field.next().await {
-            if chunk.is_err() {
+            let Ok(chunk) = chunk else {
                 return HttpResponse::new(StatusCode::BAD_REQUEST);
+            };
+            bytes.extend_from_slice(&chunk);
+            if bytes.len() > 20 * 1024 * 1024 {
+                return HttpResponse::new(StatusCode::PAYLOAD_TOO_LARGE);
             }
         }
+
+        if filename.is_none() || bytes.is_empty() {
+            continue;
+        }
+
+        let Ok(encoded) = images::encode_upload(&bytes) else {
+            continue;
+        };
+
+        if images::insert(&pool, &encoded, filename.as_deref())
+            .await
+            .is_err()
+        {
+            return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+
+        image_count += 1;
     }
 
-    redirect(&format!("/admin/import?uploaded={file_count}"))
+    redirect(&format!("/admin/import?uploaded={image_count}"))
 }
 
 fn render_admin_login(
@@ -236,6 +275,7 @@ fn render_admin_login(
             AdminView::Login { next },
             Vec::new(),
             None,
+            Vec::new(),
         ),
         StatusCode::OK,
     )
@@ -254,7 +294,7 @@ async fn render_admin_list(
     render_with_styles(
         hb,
         "admin/index",
-        admin_data(query, true, AdminView::List, documents, None),
+        admin_data(query, true, AdminView::List, documents, None, Vec::new()),
         StatusCode::OK,
     )
 }
@@ -283,16 +323,32 @@ async fn render_admin_edit(
     render_with_styles(
         hb,
         "admin/index",
-        admin_data(query, true, AdminView::Edit, documents, selected),
+        admin_data(
+            query,
+            true,
+            AdminView::Edit,
+            documents,
+            selected,
+            Vec::new(),
+        ),
         StatusCode::OK,
     )
 }
 
-fn render_admin_import(hb: WebTemplates, query: AdminQuery) -> HttpResponse {
+async fn render_admin_import(
+    hb: WebTemplates,
+    pool: web::Data<SqlitePool>,
+    query: AdminQuery,
+) -> HttpResponse {
+    let images = match images::list(&pool).await {
+        Ok(images) => images,
+        Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+
     render_with_styles(
         hb,
         "admin/index",
-        admin_data(query, true, AdminView::Import, Vec::new(), None),
+        admin_data(query, true, AdminView::Import, Vec::new(), None, images),
         StatusCode::OK,
     )
 }
@@ -311,6 +367,7 @@ fn admin_data(
     view: AdminView<'_>,
     documents: Vec<documents::StoredDocument>,
     selected: Option<documents::StoredDocument>,
+    images: Vec<images::ImageSummary>,
 ) -> serde_json::Value {
     let selected_doc_id = selected.as_ref().map(|document| document.id);
     let index_doc_id = documents.first().map(|document| document.id);
@@ -335,6 +392,24 @@ fn admin_data(
             })
         })
         .collect::<Vec<_>>();
+    let images = images
+        .iter()
+        .map(|image| {
+            let alt = image.alt.as_deref().unwrap_or("uploaded image");
+            json!({
+                "id": image.id,
+                "short_id": image.id.chars().take(12).collect::<String>(),
+                "mime": image.mime,
+                "alt": image.alt,
+                "width": image.width,
+                "height": image.height,
+                "size_bytes": image.size_bytes,
+                "created_at": image.created_at,
+                "markdown": format!("![{alt}](/media/images/{})", image.id),
+            })
+        })
+        .collect::<Vec<_>>();
+    let has_images = !images.is_empty();
 
     json!({
         "styles": "",
@@ -385,6 +460,8 @@ fn admin_data(
         },
         "posts": posts,
         "has_posts": !posts.is_empty(),
+        "images": images,
+        "has_images": has_images,
         "selected_doc_id": selected_doc_id,
         "selected_doc_label": selected_doc_label,
         "draft": draft,

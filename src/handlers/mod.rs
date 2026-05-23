@@ -1,5 +1,6 @@
 mod admin;
 mod index;
+mod media;
 mod page;
 
 use actix_files::Files;
@@ -16,6 +17,7 @@ pub fn config(conf: &mut web::ServiceConfig) {
         .service(admin::logout)
         .service(admin::save_document)
         .service(admin::upload_vault)
+        .service(media::image)
         .service(index::note)
         .service(index::index);
     conf.service(api_scope);

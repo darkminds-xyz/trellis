@@ -1,5 +1,5 @@
 {
-  "name": "js",
+  "name": "trellis-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -34,8 +34,11 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.14",
     "@lezer/markdown": "^1.6.3",
-    "@prosemark/core": "^0.0.4",
-    "@prosemark/render-html": "^0.0.5",
+    "@prosemark/table": "file:../TMark/packages/table",
+    "@tmark/core": "file:../TMark/packages/core",
+    "@tmark/latex": "file:../TMark/packages/latex",
+    "@tmark/paste-rich-text": "file:../TMark/packages/paste-rich-text",
+    "@tmark/render-html": "file:../TMark/packages/render-html",
     "codemirror": "^6.0.2"
   }
 }

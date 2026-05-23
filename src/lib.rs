@@ -32,6 +32,7 @@ pub async fn run() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::PayloadConfig::new(100 * 1024 * 1024))
+            .app_data(web::JsonConfig::default().limit(5 * 1024 * 1024))
             .app_data(web::Data::new(pool.clone()))
             .app_data(admin_sessions.clone())
             .app_data(admin_login_limiter.clone())

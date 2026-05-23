@@ -3,6 +3,9 @@ use rushdown::{
     parser::{self, ParserExtension},
     renderer::html,
 };
+use rushdown_highlighting::{
+    HighlightingHtmlRendererOptions, HighlightingMode, highlighting_html_renderer_extension,
+};
 
 pub trait MarkdownHtmlRenderer {
     fn render_html(&self, markdown: &str) -> rushdown::Result<String>;
@@ -59,10 +62,31 @@ impl MarkdownHtmlRenderer for RushdownMarkdownRenderer {
             self.parser_options.clone(),
             self.renderer_options.clone(),
             self.parser_extensions(),
-            html::NO_EXTENSIONS,
+            highlighting_html_renderer_extension(HighlightingHtmlRendererOptions {
+                mode: HighlightingMode::Attribute,
+                ..HighlightingHtmlRendererOptions::default()
+            }),
         );
         let mut html = String::new();
         render(&mut html, markdown)?;
         Ok(html)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MarkdownHtmlRenderer, RushdownMarkdownRenderer};
+
+    #[test]
+    fn highlights_fenced_code_blocks() {
+        let html = RushdownMarkdownRenderer::new()
+            .render_html("```rust\nlet a = 10;\n```")
+            .expect("markdown should render");
+
+        assert!(html.contains("<pre"), "{html}");
+        assert!(html.contains("<code"), "{html}");
+        assert!(html.contains("style=\""), "{html}");
+        assert!(html.contains("let"));
+        assert!(html.contains("10"));
     }
 }

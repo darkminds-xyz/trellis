@@ -322,8 +322,14 @@ a {
       line-height: 1;
     }
 
-    & .center > article {
+    & .center {
       grid-area: grid-center;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    & .center > article {
       margin: calc($topSpacing / 2) 0 0 0;
     }
 
@@ -333,8 +339,8 @@ a {
       }
     }
 
-    & footer {
-      grid-area: grid-footer;
+    & .center > footer {
+      margin-top: auto;
     }
 
     & .center,
