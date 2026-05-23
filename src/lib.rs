@@ -19,21 +19,28 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use tokio::fs::File;
 use walkdir::WalkDir;
 
+use crate::config::AppConfig;
+
 pub type WebTemplates = web::Data<Handlebars<'static>>;
 
 pub async fn run() -> io::Result<()> {
-    dotenvy::dotenv().ok();
-    let pool = get_db_pool()
+    let config = AppConfig::load().expect("Unable to load config.yml");
+    let pool = get_db_pool(&config)
         .await
         .expect("Unable to create or load existing sqlite database!");
+    let config = web::Data::new(config);
     let admin_sessions = web::Data::new(auth::AdminSessions::new(pool.clone()));
     let admin_login_limiter = web::Data::new(auth::AdminLoginLimiter::default());
+
+    let server_addr = format!("{}:{}", config.server.host, config.server.port);
+    info!("Trellis is listening on: http://{}", &server_addr);
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::PayloadConfig::new(100 * 1024 * 1024))
             .app_data(web::JsonConfig::default().limit(5 * 1024 * 1024))
             .app_data(web::Data::new(pool.clone()))
+            .app_data(config.clone())
             .app_data(admin_sessions.clone())
             .app_data(admin_login_limiter.clone())
             .app_data(web::Data::new(build_handlebars()))
@@ -45,7 +52,7 @@ pub async fn run() -> io::Result<()> {
             )
             .configure(handlers::config)
     })
-    .bind(("0.0.0.0", 47055))?
+    .bind(server_addr)?
     .run()
     .await
 }
@@ -95,8 +102,8 @@ fn build_handlebars() -> Handlebars<'static> {
     handlebars
 }
 
-pub async fn get_db_pool() -> anyhow::Result<SqlitePool> {
-    let (uri, db_path) = sqlite_database_config(env::var("DATABASE_URL").ok());
+pub async fn get_db_pool(config: &AppConfig) -> anyhow::Result<SqlitePool> {
+    let (uri, db_path) = sqlite_database_config(config.database_url.clone());
 
     // Ensure the directories exist and create db if missing
     if let Some(db_path) = db_path {
@@ -114,7 +121,7 @@ pub async fn get_db_pool() -> anyhow::Result<SqlitePool> {
     let options = uri.parse::<SqliteConnectOptions>()?.create_if_missing(true);
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
     schemas::migrations::run(&pool).await?;
-    schemas::accounts::seed_admin_from_env(&pool).await?;
+    schemas::accounts::seed_admin_from_config(&pool, &config.admin).await?;
     Ok(pool)
 }
 

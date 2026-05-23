@@ -23,6 +23,7 @@
             {{#if site.tagline}}
               <p>{{site.tagline}}</p>
             {{/if}}
+            <div data-theme-toggle></div>
           </div>
 
           {{> components/explorer}}
@@ -92,5 +93,6 @@
     {{#if scripts.mermaid}}
       <script type="module">{{{scripts.mermaid}}}</script>
     {{/if}}
+    <script type="module" src="/static/styles.js"></script>
   </body>
 </html>

@@ -11,9 +11,9 @@ pub struct StoredDocument {
 pub async fn list(pool: &SqlitePool) -> sqlx::Result<Vec<StoredDocument>> {
     sqlx::query_as::<_, StoredDocument>(
         r#"
-        SELECT rowid AS id, doc, ctime, mtime
+        SELECT id, doc, ctime, mtime
         FROM documents
-        ORDER BY datetime(ctime) ASC, rowid ASC
+        ORDER BY datetime(ctime) ASC, id ASC
         "#,
     )
     .fetch_all(pool)
@@ -23,9 +23,9 @@ pub async fn list(pool: &SqlitePool) -> sqlx::Result<Vec<StoredDocument>> {
 pub async fn get(pool: &SqlitePool, id: i64) -> sqlx::Result<Option<StoredDocument>> {
     sqlx::query_as::<_, StoredDocument>(
         r#"
-        SELECT rowid AS id, doc, ctime, mtime
+        SELECT id, doc, ctime, mtime
         FROM documents
-        WHERE rowid = ?1
+        WHERE id = ?1
         "#,
     )
     .bind(id)
@@ -52,7 +52,7 @@ pub async fn update(pool: &SqlitePool, id: i64, doc: &str) -> sqlx::Result<bool>
         r#"
         UPDATE documents
         SET doc = ?2, mtime = CURRENT_TIMESTAMP
-        WHERE rowid = ?1
+        WHERE id = ?1
         "#,
     )
     .bind(id)

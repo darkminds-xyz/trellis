@@ -1,4 +1,4 @@
-use std::env;
+use crate::config::TypographyConfig;
 
 #[derive(Debug, Clone)]
 pub struct Typography {
@@ -7,12 +7,32 @@ pub struct Typography {
 }
 
 impl Typography {
-    pub fn from_env() -> Self {
-        let body_font = env_font("BODY_FONT").unwrap_or_else(|| "Lato".to_string());
-        let heading_font = env_font("HEADING_FONT").unwrap_or_else(|| body_font.clone());
-        let mono_font = env_font("MONO_FONT").unwrap_or_else(|| "monospace".to_string());
-        let title_font = env_font("TITLE_FONT").unwrap_or_else(|| heading_font.clone());
-        let fonts_href = env::var("GOOGLE_FONTS_HREF").unwrap_or_default();
+    pub fn from_config(config: &TypographyConfig) -> Self {
+        let body_font = config
+            .body_font
+            .as_deref()
+            .unwrap_or("Lato")
+            .trim()
+            .to_string();
+        let heading_font = config
+            .heading_font
+            .as_deref()
+            .unwrap_or(&body_font)
+            .trim()
+            .to_string();
+        let mono_font = config
+            .mono_font
+            .as_deref()
+            .unwrap_or("monospace")
+            .trim()
+            .to_string();
+        let title_font = config
+            .title_font
+            .as_deref()
+            .unwrap_or(&heading_font)
+            .trim()
+            .to_string();
+        let fonts_href = config.google_fonts_href.clone().unwrap_or_default();
 
         let font_css = format!(
             r#"
@@ -52,13 +72,6 @@ impl Typography {
             font_css,
         }
     }
-}
-
-fn env_font(key: &str) -> Option<String> {
-    env::var(key)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
 }
 
 fn font_stack(primary: &str, fallback: &[&str]) -> String {

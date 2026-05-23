@@ -11,8 +11,7 @@ use actix_web::{
         time::{Duration, OffsetDateTime},
     },
 };
-use argon2::password_hash::SaltString;
-use rand_core::OsRng;
+use argon2::password_hash::{SaltString, rand_core::OsRng};
 use sqlx::SqlitePool;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 

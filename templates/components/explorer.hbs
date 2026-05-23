@@ -1,4 +1,87 @@
 {{! Trellis Explorer, rendered server-side and hydrated by explorer.inline.js }}
+<style id="trellis-theme-toggle-style">
+.theme-toggle {
+      --size: 2rem;
+      width: var(--size);
+      height: var(--size);
+      cursor: pointer;
+      border: none;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--highlight);
+      color: var(--darkgray);
+      transition:
+        background .2s ease,
+        border-color .2s ease,
+        color .2s ease,
+        transform .15s ease;
+    }
+
+    .theme-toggle:hover {
+      color: var(--secondary);
+    }
+
+    .theme-toggle:active { transform: scale(.94); }
+
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 3px;
+    }
+
+    .theme-toggle svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      overflow: visible;
+    }
+
+    .sun,
+    .moon,
+    .rays {
+      transform-origin: center;
+      transition:
+        transform .45s cubic-bezier(.2,.8,.2,1),
+        opacity .3s ease;
+    }
+
+    .rays {
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    .sun {
+      fill: currentColor;
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .moon {
+      fill: currentColor;
+      transform: translateX(14px) scale(.35) rotate(45deg);
+      opacity: 0;
+    }
+
+    :root[saved-theme="dark"] .theme-toggle {
+      background: color-mix(in srgb, var(--lightgray) 72%, transparent);
+    }
+
+    :root[saved-theme="dark"] .sun {
+      transform: scale(.35) rotate(-45deg);
+      opacity: 0;
+    }
+
+    :root[saved-theme="dark"] .rays {
+      transform: scale(.3) rotate(-90deg);
+      opacity: 0;
+    }
+
+    :root[saved-theme="dark"] .moon {
+      transform: translateX(0) scale(1) rotate(0deg);
+      opacity: 1;
+    }
+</style>
+
 <button
   type="button"
   id="overlay-explorer-button"
@@ -24,6 +107,22 @@
 </button>
 
 <div id="overlay-explorer-container" aria-hidden="true">
+  <button aria-label="Toggle color theme" id="theme-toggle" class="theme-toggle">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g class="rays">
+        <line x1="12" y1="1.5" x2="12" y2="4"/>
+        <line x1="12" y1="20" x2="12" y2="22.5"/>
+        <line x1="1.5" y1="12" x2="4" y2="12"/>
+        <line x1="20" y1="12" x2="22.5" y2="12"/>
+        <line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/>
+        <line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/>
+        <line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/>
+        <line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/>
+      </g>
+      <circle class="sun" cx="12" cy="12" r="5"/>
+      <path class="moon" d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a7.2 7.2 0 1 0 11.3 11.3z"/>
+    </svg>
+</button>
   <div id="overlay-explorer-space">
     <div id="overlay-explorer-content">
       <h2 style="">{{explorer.title}}</h2>

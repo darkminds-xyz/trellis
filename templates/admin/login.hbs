@@ -20,6 +20,7 @@
             <a href="/">
               <h1 class="page-title">{{site.name}}</h1>
             </a>
+            <div data-theme-toggle></div>
           </div>
         </aside>
 
@@ -32,7 +33,7 @@
 
             <section class="page-content">
               {{#unless has_admin}}
-                <p role="alert">Admin credentials are not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD in .env and restart Trellis.</p>
+                <p role="alert">Admin credentials are not configured. Set admin.username and admin.password in config.yml and restart Trellis.</p>
               {{/unless}}
               {{#if error}}
                 <p role="alert">Invalid username or password.</p>
@@ -57,5 +58,6 @@
         <aside class="right sidebar"></aside>
       </div>
     </div>
+    <script type="module" src="/static/styles.js"></script>
   </body>
 </html>

@@ -24,6 +24,7 @@
             <a href="/">
               <h1 class="page-title">{{site.name}}</h1>
             </a>
+            <div data-theme-toggle></div>
           </div>
         </aside>
 
@@ -77,6 +78,10 @@
               {{/if}}
 
               {{#if is_list}}
+                <nav aria-label="Admin tools">
+                  <a href="/admin/edit/0">New post</a>
+                  <a href="/admin/import">Images</a>
+                </nav>
                 {{#if has_posts}}
                   <section class="admin-posts" aria-label="Posts">
                     <h2>Posts</h2>
@@ -113,7 +118,11 @@
                       {{#if selected_doc_label}}
                         Edit {{selected_doc_label}}
                       {{else}}
-                        Write first post
+                        {{#if is_first_post_draft}}
+                          Write first post
+                        {{else}}
+                          Draft new post
+                        {{/if}}
                       {{/if}}
                     </h2>
                     <button
@@ -156,7 +165,11 @@
                     {{#if selected_doc_label}}
                       Save {{selected_doc_label}}
                     {{else}}
-                      Publish index.md
+                      {{#if is_first_post_draft}}
+                        Publish index.md
+                      {{else}}
+                        Create post
+                      {{/if}}
                     {{/if}}
                   </button>
                 </form>
@@ -175,5 +188,6 @@
     {{#if is_edit}}
       <script type="module" src="/static/editor.js"></script>
     {{/if}}
+    <script type="module" src="/static/styles.js"></script>
   </body>
 </html>

@@ -15,6 +15,7 @@ use sqlx::SqlitePool;
 use crate::{
     WebTemplates,
     auth::{AdminLoginLimiter, AdminSessions},
+    config::AppConfig,
     schemas::{accounts, documents, images},
     typography::Typography,
 };
@@ -48,11 +49,12 @@ pub async fn admin_list(
     req: HttpRequest,
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     sessions: web::Data<AdminSessions>,
     query: web::Query<AdminQuery>,
 ) -> impl Responder {
     if sessions.is_authenticated(&req).await {
-        return render_admin_list(hb, pool, query.into_inner()).await;
+        return render_admin_list(hb, pool, config, query.into_inner()).await;
     }
 
     let has_admin = match accounts::has_admin(&pool).await {
@@ -60,7 +62,7 @@ pub async fn admin_list(
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    render_admin_login(hb, query.into_inner(), has_admin, "/admin/list")
+    render_admin_login(hb, config, query.into_inner(), has_admin, "/admin/list")
 }
 
 #[get("/admin/edit/{post_id}")]
@@ -68,6 +70,7 @@ pub async fn edit_document(
     req: HttpRequest,
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     sessions: web::Data<AdminSessions>,
     query: web::Query<AdminQuery>,
     post_id: web::Path<i64>,
@@ -81,10 +84,10 @@ pub async fn edit_document(
             Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
         };
 
-        return render_admin_login(hb, query.into_inner(), has_admin, &next);
+        return render_admin_login(hb, config, query.into_inner(), has_admin, &next);
     }
 
-    render_admin_edit(hb, pool, query.into_inner(), post_id).await
+    render_admin_edit(hb, pool, config, query.into_inner(), post_id).await
 }
 
 #[get("/admin/import")]
@@ -92,11 +95,12 @@ pub async fn import_vault(
     req: HttpRequest,
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     sessions: web::Data<AdminSessions>,
     query: web::Query<AdminQuery>,
 ) -> impl Responder {
     if sessions.is_authenticated(&req).await {
-        return render_admin_import(hb, pool, query.into_inner()).await;
+        return render_admin_import(hb, pool, config, query.into_inner()).await;
     }
 
     let has_admin = match accounts::has_admin(&pool).await {
@@ -104,7 +108,7 @@ pub async fn import_vault(
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    render_admin_login(hb, query.into_inner(), has_admin, "/admin/import")
+    render_admin_login(hb, config, query.into_inner(), has_admin, "/admin/import")
 }
 
 #[post("/admin/login")]
@@ -262,6 +266,7 @@ pub async fn upload_vault(
 
 fn render_admin_login(
     hb: WebTemplates,
+    config: web::Data<AppConfig>,
     query: AdminQuery,
     has_admin: bool,
     next: &str,
@@ -270,6 +275,7 @@ fn render_admin_login(
         hb,
         "admin/login",
         admin_data(
+            &config,
             query,
             has_admin,
             AdminView::Login { next },
@@ -284,6 +290,7 @@ fn render_admin_login(
 async fn render_admin_list(
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     query: AdminQuery,
 ) -> HttpResponse {
     let documents = match documents::list(&pool).await {
@@ -294,7 +301,15 @@ async fn render_admin_list(
     render_with_styles(
         hb,
         "admin/index",
-        admin_data(query, true, AdminView::List, documents, None, Vec::new()),
+        admin_data(
+            &config,
+            query,
+            true,
+            AdminView::List,
+            documents,
+            None,
+            Vec::new(),
+        ),
         StatusCode::OK,
     )
 }
@@ -302,6 +317,7 @@ async fn render_admin_list(
 async fn render_admin_edit(
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     query: AdminQuery,
     post_id: i64,
 ) -> HttpResponse {
@@ -324,6 +340,7 @@ async fn render_admin_edit(
         hb,
         "admin/index",
         admin_data(
+            &config,
             query,
             true,
             AdminView::Edit,
@@ -338,6 +355,7 @@ async fn render_admin_edit(
 async fn render_admin_import(
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     query: AdminQuery,
 ) -> HttpResponse {
     let images = match images::list(&pool).await {
@@ -348,7 +366,15 @@ async fn render_admin_import(
     render_with_styles(
         hb,
         "admin/index",
-        admin_data(query, true, AdminView::Import, Vec::new(), None, images),
+        admin_data(
+            &config,
+            query,
+            true,
+            AdminView::Import,
+            Vec::new(),
+            None,
+            images,
+        ),
         StatusCode::OK,
     )
 }
@@ -362,6 +388,7 @@ enum AdminView<'a> {
 }
 
 fn admin_data(
+    config: &AppConfig,
     query: AdminQuery,
     has_admin: bool,
     view: AdminView<'_>,
@@ -372,12 +399,13 @@ fn admin_data(
     let selected_doc_id = selected.as_ref().map(|document| document.id);
     let index_doc_id = documents.first().map(|document| document.id);
     let selected_doc_label = selected_doc_id.map(|id| document_label(id, index_doc_id));
+    let is_first_post_draft = selected_doc_id.is_none() && documents.is_empty();
     let draft = selected
         .as_ref()
         .map(|document| document.doc.as_str())
         .unwrap_or("# First post\n\nStart writing your first Trellis document here.\n");
     let draft_json = serde_json::to_string(draft).unwrap_or_else(|_| "\"\"".to_string());
-    let typography = Typography::from_env();
+    let typography = Typography::from_config(&config.typography);
     let posts = documents
         .iter()
         .map(|document| {
@@ -417,8 +445,8 @@ fn admin_data(
         "font_css": typography.font_css,
         "fonts_href": typography.fonts_href,
         "site": {
-            "name": "Trellis",
-            "tagline": serde_json::Value::Null,
+            "name": config.site.name.clone(),
+            "tagline": config.site.tagline.clone(),
         },
         "footer": {
             "version": env!("CARGO_PKG_VERSION"),
@@ -464,6 +492,7 @@ fn admin_data(
         "has_images": has_images,
         "selected_doc_id": selected_doc_id,
         "selected_doc_label": selected_doc_label,
+        "is_first_post_draft": is_first_post_draft,
         "draft": draft,
         "draft_json": draft_json,
     })

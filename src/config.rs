@@ -1,1 +1,218 @@
+use std::{fs, path::Path};
 
+use anyhow::Context;
+use yaml_rust::{Yaml, YamlLoader};
+
+#[derive(Debug, Clone, Default)]
+pub struct AppConfig {
+    pub database_url: Option<String>,
+    pub admin: AdminConfig,
+    pub typography: TypographyConfig,
+    pub site: SiteConfig,
+    pub server: ServerConfig,
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 47055,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AdminConfig {
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TypographyConfig {
+    pub body_font: Option<String>,
+    pub heading_font: Option<String>,
+    pub mono_font: Option<String>,
+    pub title_font: Option<String>,
+    pub google_fonts_href: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SiteConfig {
+    pub name: String,
+    pub tagline: Option<String>,
+}
+
+impl Default for SiteConfig {
+    fn default() -> Self {
+        Self {
+            name: "Trellis".to_string(),
+            tagline: None,
+        }
+    }
+}
+
+impl AppConfig {
+    pub fn load() -> anyhow::Result<Self> {
+        Self::load_from_path("config.yml")
+    }
+
+    pub fn load_from_path(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref();
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+
+        let source = fs::read_to_string(path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        Self::from_yaml_str(&source).with_context(|| format!("failed to parse {}", path.display()))
+    }
+
+    fn from_yaml_str(source: &str) -> anyhow::Result<Self> {
+        let docs = YamlLoader::load_from_str(source)?;
+        let Some(root) = docs.first() else {
+            return Ok(Self::default());
+        };
+
+        let default_site = SiteConfig::default();
+        let default_server = ServerConfig::default();
+
+        Ok(Self {
+            server: ServerConfig {
+                host: string(root, &["server", "host"]).unwrap_or(default_server.host),
+                port: number_u16(root, &["server", "host"]).unwrap_or(default_server.port),
+            },
+            database_url: string(root, &["database_url"])
+                .or_else(|| string(root, &["database", "url"]))
+                .or_else(|| string(root, &["DATABASE_URL"])),
+            admin: AdminConfig {
+                username: string(root, &["admin", "username"])
+                    .or_else(|| string(root, &["ADMIN_USERNAME"])),
+                password: string(root, &["admin", "password"])
+                    .or_else(|| string(root, &["ADMIN_PASSWORD"])),
+            },
+            typography: TypographyConfig {
+                body_font: string(root, &["typography", "body_font"])
+                    .or_else(|| string(root, &["BODY_FONT"])),
+                heading_font: string(root, &["typography", "heading_font"])
+                    .or_else(|| string(root, &["HEADING_FONT"])),
+                mono_font: string(root, &["typography", "mono_font"])
+                    .or_else(|| string(root, &["MONO_FONT"])),
+                title_font: string(root, &["typography", "title_font"])
+                    .or_else(|| string(root, &["TITLE_FONT"])),
+                google_fonts_href: string(root, &["typography", "google_fonts_href"])
+                    .or_else(|| string(root, &["GOOGLE_FONTS_HREF"])),
+            },
+            site: SiteConfig {
+                name: string(root, &["site", "name"])
+                    .or_else(|| string(root, &["SITE_NAME"]))
+                    .unwrap_or(default_site.name),
+                tagline: string(root, &["site", "tagline"])
+                    .or_else(|| string(root, &["SITE_TAGLINE"])),
+            },
+        })
+    }
+}
+
+fn string(root: &Yaml, path: &[&str]) -> Option<String> {
+    let value = path.iter().try_fold(root, |node, key| {
+        let Yaml::Hash(hash) = node else {
+            return None;
+        };
+
+        hash.get(&Yaml::String((*key).to_string()))
+    })?;
+
+    match value {
+        Yaml::String(value) => non_empty(value),
+        Yaml::Integer(value) => non_empty(&value.to_string()),
+        Yaml::Real(value) => non_empty(value),
+        Yaml::Boolean(value) => non_empty(&value.to_string()),
+        _ => None,
+    }
+}
+
+fn number_u16(root: &Yaml, path: &[&str]) -> Option<u16> {
+    let value = path.iter().try_fold(root, |node, key| {
+        let Yaml::Hash(hash) = node else {
+            return None;
+        };
+
+        hash.get(&Yaml::String((*key).to_string()))
+    })?;
+
+    match value {
+        Yaml::Integer(value) => Some(*value as u16),
+        _ => None,
+    }
+}
+
+fn non_empty(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppConfig;
+
+    #[test]
+    fn reads_nested_config_yml_values() {
+        let config = AppConfig::from_yaml_str(
+            r#"
+database:
+  url: data/trellis.db
+admin:
+  username: admin
+  password: secret
+typography:
+  body_font: Inter
+  heading_font: Lora
+  mono_font: "JetBrains Mono"
+  title_font: Lora
+  google_fonts_href: https://fonts.example.test/css
+site:
+  name: My Notes
+  tagline: Working notes
+"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(config.database_url.as_deref(), Some("data/trellis.db"));
+        assert_eq!(config.admin.username.as_deref(), Some("admin"));
+        assert_eq!(config.admin.password.as_deref(), Some("secret"));
+        assert_eq!(config.typography.body_font.as_deref(), Some("Inter"));
+        assert_eq!(config.typography.heading_font.as_deref(), Some("Lora"));
+        assert_eq!(
+            config.typography.mono_font.as_deref(),
+            Some("JetBrains Mono")
+        );
+        assert_eq!(config.site.name, "My Notes");
+        assert_eq!(config.site.tagline.as_deref(), Some("Working notes"));
+    }
+
+    #[test]
+    fn reads_env_style_config_yml_values() {
+        let config = AppConfig::from_yaml_str(
+            r#"
+DATABASE_URL: "sqlite::memory:"
+ADMIN_USERNAME: admin
+ADMIN_PASSWORD: secret
+BODY_FONT: Inter
+SITE_NAME: Trellis Test
+"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(config.database_url.as_deref(), Some("sqlite::memory:"));
+        assert_eq!(config.admin.username.as_deref(), Some("admin"));
+        assert_eq!(config.admin.password.as_deref(), Some("secret"));
+        assert_eq!(config.typography.body_font.as_deref(), Some("Inter"));
+        assert_eq!(config.site.name, "Trellis Test");
+    }
+}

@@ -9,6 +9,7 @@ use actix_web::{Responder, get};
 
 use crate::{
     WebTemplates,
+    config::AppConfig,
     markdown::{MarkdownHtmlRenderer, RushdownMarkdownRenderer},
     schemas::documents,
     typography::Typography,
@@ -20,7 +21,11 @@ pub async fn healthcheck_handler() -> impl Responder {
 }
 
 #[get("/")]
-pub async fn index(hb: WebTemplates, pool: web::Data<SqlitePool>) -> impl Responder {
+pub async fn index(
+    hb: WebTemplates,
+    pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
     let documents = match documents::list(&pool).await {
         Ok(documents) => documents,
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
@@ -30,7 +35,15 @@ pub async fn index(hb: WebTemplates, pool: web::Data<SqlitePool>) -> impl Respon
         return render_with_styles(
             hb,
             "onboarding",
-            page_data("Welcome to Trellis", "index", None, None, None, Vec::new()),
+            page_data(
+                &config,
+                "Welcome to Trellis",
+                "index",
+                None,
+                None,
+                None,
+                Vec::new(),
+            ),
             StatusCode::OK,
         );
     }
@@ -41,6 +54,7 @@ pub async fn index(hb: WebTemplates, pool: web::Data<SqlitePool>) -> impl Respon
 
     render_document(
         hb,
+        config,
         "index",
         document,
         documents.first().map(|document| document.id),
@@ -52,6 +66,7 @@ pub async fn index(hb: WebTemplates, pool: web::Data<SqlitePool>) -> impl Respon
 pub async fn note(
     hb: WebTemplates,
     pool: web::Data<SqlitePool>,
+    config: web::Data<AppConfig>,
     post_id: web::Path<i64>,
 ) -> impl Responder {
     let post_id = post_id.into_inner();
@@ -66,6 +81,7 @@ pub async fn note(
 
     render_document(
         hb,
+        config,
         "page",
         document,
         documents.first().map(|document| document.id),
@@ -75,6 +91,7 @@ pub async fn note(
 
 fn render_document(
     hb: WebTemplates,
+    config: web::Data<AppConfig>,
     template: &str,
     document: &documents::StoredDocument,
     index_id: Option<i64>,
@@ -91,6 +108,7 @@ fn render_document(
         hb,
         template,
         page_data(
+            &config,
             &title,
             &document_slug(document.id, index_id),
             Some(html),
@@ -118,6 +136,7 @@ fn render_with_styles(
 }
 
 fn page_data(
+    config: &AppConfig,
     title: &str,
     slug: &str,
     article_html: Option<String>,
@@ -126,15 +145,15 @@ fn page_data(
     nav: Vec<serde_json::Value>,
 ) -> serde_json::Value {
     let html = article_html.unwrap_or_default();
-    let typography = Typography::from_env();
+    let typography = Typography::from_config(&config.typography);
 
     json!({
         "styles": "",
         "font_css": typography.font_css,
         "fonts_href": typography.fonts_href,
         "site": {
-            "name": "Trellis",
-            "tagline": serde_json::Value::Null,
+            "name": config.site.name.clone(),
+            "tagline": config.site.tagline.clone(),
         },
         "article": {
             "slug": slug,

@@ -9,7 +9,7 @@ const MIGRATIONS: &[&str] = &[
 
 pub async fn run(pool: &SqlitePool) -> sqlx::Result<()> {
     for migration in MIGRATIONS {
-        sqlx::query(migration).execute(pool).await?;
+        sqlx::query(*migration).execute(pool).await?;
     }
 
     Ok(())

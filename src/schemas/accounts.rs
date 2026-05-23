@@ -1,5 +1,3 @@
-use std::env;
-
 use anyhow::{Context, anyhow};
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
@@ -8,23 +6,25 @@ use argon2::{
 use log::warn;
 use sqlx::{FromRow, SqlitePool};
 
+use crate::config::AdminConfig;
+
 #[derive(Debug, FromRow)]
 struct Account {
     password: String,
 }
 
-pub async fn seed_admin_from_env(pool: &SqlitePool) -> anyhow::Result<()> {
-    let username = match env::var("ADMIN_USERNAME") {
-        Ok(username) if !username.trim().is_empty() => username,
+pub async fn seed_admin_from_config(pool: &SqlitePool, config: &AdminConfig) -> anyhow::Result<()> {
+    let username = match config.username.as_deref() {
+        Some(username) if !username.trim().is_empty() => username.trim().to_string(),
         _ => {
-            warn!("ADMIN_USERNAME is not configured; /admin login is disabled");
+            warn!("admin.username is not configured in config.yml; /admin login is disabled");
             return Ok(());
         }
     };
-    let password = match env::var("ADMIN_PASSWORD") {
-        Ok(password) if !password.is_empty() => password,
+    let password = match config.password.as_deref() {
+        Some(password) if !password.is_empty() => password,
         _ => {
-            warn!("ADMIN_PASSWORD is not configured; /admin login is disabled");
+            warn!("admin.password is not configured in config.yml; /admin login is disabled");
             return Ok(());
         }
     };

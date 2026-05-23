@@ -10,9 +10,10 @@ CREATE TABLE IF NOT EXISTS images (
 );
 
 CREATE TABLE IF NOT EXISTS document_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   document_id INTEGER NOT NULL,
   image_id TEXT NOT NULL,
-  PRIMARY KEY (document_id, image_id),
-  FOREIGN KEY (document_id) REFERENCES documents(rowid),
+  UNIQUE(document_id, image_id),
+  FOREIGN KEY (document_id) REFERENCES documents(id),
   FOREIGN KEY (image_id) REFERENCES images(id)
 );
