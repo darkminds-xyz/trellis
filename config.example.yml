@@ -1,0 +1,21 @@
+server:
+  host: 127.0.0.1
+  port: 47055
+
+database:
+  url: trellis.db
+
+admin:
+  username: admin
+  password: change-me
+
+typography:
+  body_font: Lato
+  heading_font: Lato
+  mono_font: monospace
+  title_font: Lato
+  google_fonts_href: ""
+
+site:
+  name: Trellis
+  tagline:

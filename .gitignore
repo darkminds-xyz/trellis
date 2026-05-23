@@ -3,6 +3,7 @@ static/
 .build/
 trellis.db
 .env
+config.yml
 nginx/
 TMark/
 js/public/assets/
