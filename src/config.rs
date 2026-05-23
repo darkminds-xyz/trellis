@@ -27,10 +27,21 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AdminConfig {
     pub username: Option<String>,
     pub password: Option<String>,
+    pub secure_cookies: bool,
+}
+
+impl Default for AdminConfig {
+    fn default() -> Self {
+        Self {
+            username: None,
+            password: None,
+            secure_cookies: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -85,35 +96,26 @@ impl AppConfig {
         Ok(Self {
             server: ServerConfig {
                 host: string(root, &["server", "host"]).unwrap_or(default_server.host),
-                port: number_u16(root, &["server", "host"]).unwrap_or(default_server.port),
+                port: number_u16(root, &["server", "port"]).unwrap_or(default_server.port),
             },
             database_url: string(root, &["database_url"])
                 .or_else(|| string(root, &["database", "url"]))
                 .or_else(|| string(root, &["DATABASE_URL"])),
             admin: AdminConfig {
-                username: string(root, &["admin", "username"])
-                    .or_else(|| string(root, &["ADMIN_USERNAME"])),
-                password: string(root, &["admin", "password"])
-                    .or_else(|| string(root, &["ADMIN_PASSWORD"])),
+                username: string(root, &["admin", "username"]),
+                password: string(root, &["admin", "password"]),
+                secure_cookies: boolean(root, &["admin", "secure_cookies"]).unwrap_or(true),
             },
             typography: TypographyConfig {
-                body_font: string(root, &["typography", "body_font"])
-                    .or_else(|| string(root, &["BODY_FONT"])),
-                heading_font: string(root, &["typography", "heading_font"])
-                    .or_else(|| string(root, &["HEADING_FONT"])),
-                mono_font: string(root, &["typography", "mono_font"])
-                    .or_else(|| string(root, &["MONO_FONT"])),
-                title_font: string(root, &["typography", "title_font"])
-                    .or_else(|| string(root, &["TITLE_FONT"])),
-                google_fonts_href: string(root, &["typography", "google_fonts_href"])
-                    .or_else(|| string(root, &["GOOGLE_FONTS_HREF"])),
+                body_font: string(root, &["typography", "body_font"]),
+                heading_font: string(root, &["typography", "heading_font"]),
+                mono_font: string(root, &["typography", "mono_font"]),
+                title_font: string(root, &["typography", "title_font"]),
+                google_fonts_href: string(root, &["typography", "google_fonts_href"]),
             },
             site: SiteConfig {
-                name: string(root, &["site", "name"])
-                    .or_else(|| string(root, &["SITE_NAME"]))
-                    .unwrap_or(default_site.name),
-                tagline: string(root, &["site", "tagline"])
-                    .or_else(|| string(root, &["SITE_TAGLINE"])),
+                name: string(root, &["site", "name"]).unwrap_or(default_site.name),
+                tagline: string(root, &["site", "tagline"]),
             },
         })
     }
@@ -152,6 +154,26 @@ fn number_u16(root: &Yaml, path: &[&str]) -> Option<u16> {
     }
 }
 
+fn boolean(root: &Yaml, path: &[&str]) -> Option<bool> {
+    let value = path.iter().try_fold(root, |node, key| {
+        let Yaml::Hash(hash) = node else {
+            return None;
+        };
+
+        hash.get(&Yaml::String((*key).to_string()))
+    })?;
+
+    match value {
+        Yaml::Boolean(value) => Some(*value),
+        Yaml::String(value) => match value.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => Some(true),
+            "false" | "0" | "no" | "off" => Some(false),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
@@ -170,6 +192,7 @@ database:
 admin:
   username: admin
   password: secret
+  secure_cookies: false
 typography:
   body_font: Inter
   heading_font: Lora
@@ -186,6 +209,7 @@ site:
         assert_eq!(config.database_url.as_deref(), Some("data/trellis.db"));
         assert_eq!(config.admin.username.as_deref(), Some("admin"));
         assert_eq!(config.admin.password.as_deref(), Some("secret"));
+        assert!(!config.admin.secure_cookies);
         assert_eq!(config.typography.body_font.as_deref(), Some("Inter"));
         assert_eq!(config.typography.heading_font.as_deref(), Some("Lora"));
         assert_eq!(
@@ -194,25 +218,5 @@ site:
         );
         assert_eq!(config.site.name, "My Notes");
         assert_eq!(config.site.tagline.as_deref(), Some("Working notes"));
-    }
-
-    #[test]
-    fn reads_env_style_config_yml_values() {
-        let config = AppConfig::from_yaml_str(
-            r#"
-DATABASE_URL: "sqlite::memory:"
-ADMIN_USERNAME: admin
-ADMIN_PASSWORD: secret
-BODY_FONT: Inter
-SITE_NAME: Trellis Test
-"#,
-        )
-        .expect("config should parse");
-
-        assert_eq!(config.database_url.as_deref(), Some("sqlite::memory:"));
-        assert_eq!(config.admin.username.as_deref(), Some("admin"));
-        assert_eq!(config.admin.password.as_deref(), Some("secret"));
-        assert_eq!(config.typography.body_font.as_deref(), Some("Inter"));
-        assert_eq!(config.site.name, "Trellis Test");
     }
 }

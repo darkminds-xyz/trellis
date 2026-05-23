@@ -8,7 +8,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --pm-selection-color: #000;
+  --pm-selection-color: #fff;
   --pm-selection-background: #1089eb44;
   --pm-header-mark-color: oklch(82.8% 0.111 230.318);
   --pm-link-color: oklch(58.8% 0.158 241.966);
@@ -43,7 +43,7 @@
   --pm-spellcheck-tooltip-font-size: 0.9rem;
 }
 
-:root[data-theme="dark"] {
+:root[saved-theme="dark"] {
   --pm-header-mark-color: oklch(44.3% 0.11 240.79);
   --pm-link-color: oklch(58.8% 0.158 241.966);
   --pm-muted-color: oklch(55.4% 0.046 257.417);
@@ -105,6 +105,68 @@
   margin: 0;
 }
 
+.admin-editor-meta,
+.admin-manager {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+@media all and (min-width: 720px) {
+  .admin-manager {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.admin-inline-form,
+.admin-document-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+}
+
+.admin-inline-form h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-inline-form label,
+.admin-document-card label,
+.admin-editor-meta label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-inline-form input,
+.admin-inline-form select,
+.admin-document-card input,
+.admin-document-card select,
+.admin-editor-meta input,
+.admin-editor-meta select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  color: var(--dark);
+  background: var(--light);
+  font: inherit;
+}
+
+.admin-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-checkbox input {
+  width: auto;
+  min-height: auto;
+}
+
 .admin-editor-toggle {
   display: inline-flex;
   align-items: center;
@@ -152,6 +214,54 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.admin-document-row {
+  margin-left: var(--admin-depth, 0);
+}
+
+.admin-document-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media all and (min-width: 860px) {
+  .admin-document-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}
+
+.admin-document-card.selected {
+  border-color: var(--secondary);
+}
+
+.admin-document-main {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr);
+  gap: 0.65rem;
+}
+
+@media all and (min-width: 860px) {
+  .admin-document-main {
+    grid-template-columns: minmax(10rem, 1.1fr) minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
+    align-items: end;
+  }
+}
+
+.admin-document-main a {
+  color: var(--dark);
+  text-decoration: none;
+}
+
+.admin-document-main a:hover {
+  color: var(--secondary);
+}
+
+.admin-document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
 }
 
 .admin-post-link {

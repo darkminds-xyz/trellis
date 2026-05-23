@@ -1,7 +1,10 @@
-.content-meta {
-  color: var(--darkgray);
+.content-meta,
+.content-update {
+  color: var(--gray);
   margin: 0;
+}
 
+.content-meta {
   &[show-comma="true"] {
     > *:not(:last-child) {
       margin-right: 8px;
@@ -11,4 +14,27 @@
       }
     }
   }
+}
+
+.center article .page-header {
+  row-gap: 0.35rem;
+}
+
+.center article .popover-hint {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.center article .article-title {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.center article .content-meta,
+.center article .content-update {
+  color: var(--gray);
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }

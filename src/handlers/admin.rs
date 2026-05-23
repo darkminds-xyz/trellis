@@ -2,9 +2,9 @@ use std::fs;
 
 use actix_multipart::Multipart;
 use actix_web::{
-    HttpRequest, HttpResponse, HttpResponseBuilder, Responder, get,
+    HttpRequest, HttpResponse, HttpResponseBuilder, Responder, delete, get,
     http::{StatusCode, header},
-    post, web,
+    patch, post, web,
 };
 use futures_util::StreamExt;
 use handlebars::Handlebars;
@@ -16,6 +16,7 @@ use crate::{
     WebTemplates,
     auth::{AdminLoginLimiter, AdminSessions},
     config::AppConfig,
+    markdown::title_from_markdown,
     schemas::{accounts, documents, images},
     typography::Typography,
 };
@@ -37,6 +38,48 @@ pub struct LoginForm {
 #[derive(Debug, Deserialize)]
 pub struct DraftPayload {
     doc: String,
+    draft: Option<bool>,
+    name: Option<String>,
+    #[serde(default)]
+    parent_id: Option<Option<i64>>,
+    title: Option<String>,
+    change_summary: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateFolderPayload {
+    parent_id: Option<i64>,
+    name: String,
+    hidden: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateFolderPayload {
+    name: Option<String>,
+    #[serde(default)]
+    parent_id: Option<Option<i64>>,
+    hidden: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateNotePayload {
+    parent_id: Option<i64>,
+    name: String,
+    markdown: String,
+    title: Option<String>,
+    draft: Option<bool>,
+    change_summary: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateNotePayload {
+    name: Option<String>,
+    #[serde(default)]
+    parent_id: Option<Option<i64>>,
+    markdown: Option<String>,
+    title: Option<String>,
+    draft: Option<bool>,
+    change_summary: Option<String>,
 }
 
 #[get("/admin")]
@@ -190,7 +233,7 @@ pub async fn save_document(
     }
 
     let doc_id = if post_id > 0 { Some(post_id) } else { None };
-    match documents::save(&pool, doc_id, &payload.doc).await {
+    match save_editor_document(&pool, doc_id, &payload).await {
         Ok(Some(doc_id)) => {
             if images::sync_document_images(&pool, doc_id, &payload.doc)
                 .await
@@ -207,6 +250,227 @@ pub async fn save_document(
         }
         Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
         Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[post("/admin/folders")]
+pub async fn create_folder(
+    req: HttpRequest,
+    payload: web::Json<CreateFolderPayload>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    match documents::create_folder(
+        &pool,
+        payload.parent_id,
+        &payload.name,
+        payload.hidden.unwrap_or(false),
+    )
+    .await
+    {
+        Ok(id) => match documents::get_node(&pool, id).await {
+            Ok(Some(node)) => HttpResponse::Created().json(document_node_json(&node)),
+            Ok(None) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+        },
+        Err(err) => document_error_response(err),
+    }
+}
+
+#[get("/admin/documents")]
+pub async fn list_documents(
+    req: HttpRequest,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    match documents::list_nodes(&pool).await {
+        Ok(nodes) => HttpResponse::Ok().json(json!({
+            "documents": nodes.iter().map(document_node_json).collect::<Vec<_>>(),
+        })),
+        Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[patch("/admin/folders/{folder_id}")]
+pub async fn update_folder(
+    req: HttpRequest,
+    folder_id: web::Path<i64>,
+    payload: web::Json<UpdateFolderPayload>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    let folder_id = folder_id.into_inner();
+    match documents::update_folder(
+        &pool,
+        folder_id,
+        payload.name.as_deref(),
+        payload.parent_id,
+        payload.hidden,
+    )
+    .await
+    {
+        Ok(true) => match documents::get_node(&pool, folder_id).await {
+            Ok(Some(node)) => HttpResponse::Ok().json(document_node_json(&node)),
+            Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
+            Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+        },
+        Ok(false) => HttpResponse::new(StatusCode::NOT_FOUND),
+        Err(err) => document_error_response(err),
+    }
+}
+
+#[post("/admin/notes")]
+pub async fn create_note(
+    req: HttpRequest,
+    payload: web::Json<CreateNotePayload>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    if payload.markdown.trim().is_empty() {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "empty",
+            "message": "Document cannot be empty.",
+        }));
+    }
+
+    match documents::create_note(
+        &pool,
+        payload.parent_id,
+        &payload.name,
+        &payload.markdown,
+        payload.draft.unwrap_or(false),
+        payload.title.as_deref(),
+        payload.change_summary.as_deref(),
+    )
+    .await
+    {
+        Ok(id) => {
+            if images::sync_document_images(&pool, id, &payload.markdown)
+                .await
+                .is_err()
+            {
+                return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+
+            match documents::get(&pool, id).await {
+                Ok(Some(note)) => HttpResponse::Created().json(document_json(&note)),
+                Ok(None) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+                Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        }
+        Err(err) => document_error_response(err),
+    }
+}
+
+#[patch("/admin/notes/{note_id}")]
+pub async fn update_note(
+    req: HttpRequest,
+    note_id: web::Path<i64>,
+    payload: web::Json<UpdateNotePayload>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    let note_id = note_id.into_inner();
+    match documents::update_note(
+        &pool,
+        note_id,
+        payload.name.as_deref(),
+        payload.parent_id,
+        payload.markdown.as_deref(),
+        payload.draft,
+        payload.title.as_deref(),
+        payload.change_summary.as_deref(),
+    )
+    .await
+    {
+        Ok(true) => {
+            if let Some(markdown) = payload.markdown.as_deref() {
+                if images::sync_document_images(&pool, note_id, markdown)
+                    .await
+                    .is_err()
+                {
+                    return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+
+            match documents::get(&pool, note_id).await {
+                Ok(Some(note)) => HttpResponse::Ok().json(document_json(&note)),
+                Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
+                Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        }
+        Ok(false) => HttpResponse::new(StatusCode::NOT_FOUND),
+        Err(err) => document_error_response(err),
+    }
+}
+
+#[get("/admin/notes/{note_id}/versions")]
+pub async fn list_note_versions(
+    req: HttpRequest,
+    note_id: web::Path<i64>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    match documents::list_versions(&pool, note_id.into_inner()).await {
+        Ok(versions) => HttpResponse::Ok().json(json!({
+            "versions": versions
+                .iter()
+                .map(|version| {
+                    json!({
+                        "id": version.id,
+                        "document_id": version.document_id,
+                        "version_number": version.version_number,
+                        "title": version.title,
+                        "markdown": version.markdown,
+                        "change_summary": version.change_summary,
+                        "ctime": version.ctime,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        })),
+        Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[delete("/admin/documents/{document_id}")]
+pub async fn delete_document(
+    req: HttpRequest,
+    document_id: web::Path<i64>,
+    pool: web::Data<SqlitePool>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return api_unauthorized();
+    }
+
+    match documents::delete(&pool, document_id.into_inner()).await {
+        Ok(true) => HttpResponse::NoContent().finish(),
+        Ok(false) => HttpResponse::new(StatusCode::NOT_FOUND),
+        Err(err) => document_error_response(err),
     }
 }
 
@@ -280,6 +544,7 @@ fn render_admin_login(
             has_admin,
             AdminView::Login { next },
             Vec::new(),
+            Vec::new(),
             None,
             Vec::new(),
         ),
@@ -297,6 +562,10 @@ async fn render_admin_list(
         Ok(documents) => documents,
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
+    let nodes = match documents::list_nodes(&pool).await {
+        Ok(nodes) => nodes,
+        Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    };
 
     render_with_styles(
         hb,
@@ -307,6 +576,7 @@ async fn render_admin_list(
             true,
             AdminView::List,
             documents,
+            nodes,
             None,
             Vec::new(),
         ),
@@ -323,6 +593,10 @@ async fn render_admin_edit(
 ) -> HttpResponse {
     let documents = match documents::list(&pool).await {
         Ok(documents) => documents,
+        Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+    let nodes = match documents::list_nodes(&pool).await {
+        Ok(nodes) => nodes,
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
@@ -345,6 +619,7 @@ async fn render_admin_edit(
             true,
             AdminView::Edit,
             documents,
+            nodes,
             selected,
             Vec::new(),
         ),
@@ -372,6 +647,7 @@ async fn render_admin_import(
             true,
             AdminView::Import,
             Vec::new(),
+            Vec::new(),
             None,
             images,
         ),
@@ -393,10 +669,17 @@ fn admin_data(
     has_admin: bool,
     view: AdminView<'_>,
     documents: Vec<documents::StoredDocument>,
+    nodes: Vec<documents::DocumentNode>,
     selected: Option<documents::StoredDocument>,
     images: Vec<images::ImageSummary>,
 ) -> serde_json::Value {
     let selected_doc_id = selected.as_ref().map(|document| document.id);
+    let selected_doc_name = selected.as_ref().map(|document| document.name.as_str());
+    let selected_doc_parent_id = selected.as_ref().and_then(|document| document.parent_id);
+    let selected_doc_is_draft = selected
+        .as_ref()
+        .map(|document| document.draft)
+        .unwrap_or(false);
     let index_doc_id = documents.first().map(|document| document.id);
     let selected_doc_label = selected_doc_id.map(|id| document_label(id, index_doc_id));
     let is_first_post_draft = selected_doc_id.is_none() && documents.is_empty();
@@ -413,13 +696,18 @@ fn admin_data(
             json!({
                 "id": document.id,
                 "label": label,
-                "title": markdown_title(&document.doc).unwrap_or(&label),
+                "title": title_from_markdown(&document.doc).unwrap_or_else(|| label.clone()),
                 "ctime": document.ctime,
                 "mtime": document.mtime,
                 "selected": Some(document.id) == selected_doc_id,
             })
         })
         .collect::<Vec<_>>();
+    let folder_options = folder_options(
+        &nodes,
+        selected.as_ref().and_then(|document| document.parent_id),
+    );
+    let document_tree = document_tree(&nodes, selected_doc_id);
     let images = images
         .iter()
         .map(|image| {
@@ -488,6 +776,12 @@ fn admin_data(
         },
         "posts": posts,
         "has_posts": !posts.is_empty(),
+        "document_tree": document_tree,
+        "has_document_tree": !nodes.is_empty(),
+        "folder_options": folder_options,
+        "selected_doc_name": selected_doc_name,
+        "selected_doc_parent_id": selected_doc_parent_id,
+        "selected_doc_is_draft": selected_doc_is_draft,
         "images": images,
         "has_images": has_images,
         "selected_doc_id": selected_doc_id,
@@ -522,6 +816,201 @@ fn render(
         Ok(body) => builder.content_type("text/html; charset=utf-8").body(body),
         Err(err) => HttpResponse::InternalServerError().body(format!("Template error: {}", err)),
     }
+}
+
+fn folder_options(
+    nodes: &[documents::DocumentNode],
+    selected_parent_id: Option<i64>,
+) -> Vec<serde_json::Value> {
+    let mut options = vec![json!({
+        "id": serde_json::Value::Null,
+        "label": "Root",
+        "selected": selected_parent_id.is_none(),
+    })];
+    append_folder_options(nodes, None, 0, selected_parent_id, &mut options);
+    options
+}
+
+fn append_folder_options(
+    nodes: &[documents::DocumentNode],
+    parent_id: Option<i64>,
+    depth: usize,
+    selected_parent_id: Option<i64>,
+    options: &mut Vec<serde_json::Value>,
+) {
+    let mut children = nodes
+        .iter()
+        .filter(|node| node.parent_id == parent_id && node.kind == "folder")
+        .collect::<Vec<_>>();
+    children.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    for node in children {
+        let prefix = "  ".repeat(depth);
+        options.push(json!({
+            "id": node.id,
+            "label": format!("{prefix}{}", node.name),
+            "selected": Some(node.id) == selected_parent_id,
+        }));
+        append_folder_options(nodes, Some(node.id), depth + 1, selected_parent_id, options);
+    }
+}
+
+fn document_tree(
+    nodes: &[documents::DocumentNode],
+    selected_doc_id: Option<i64>,
+) -> Vec<serde_json::Value> {
+    let mut rows = Vec::new();
+    append_document_tree(nodes, None, 0, selected_doc_id, &mut rows);
+    rows
+}
+
+fn append_document_tree(
+    nodes: &[documents::DocumentNode],
+    parent_id: Option<i64>,
+    depth: usize,
+    selected_doc_id: Option<i64>,
+    rows: &mut Vec<serde_json::Value>,
+) {
+    let mut children = nodes
+        .iter()
+        .filter(|node| node.parent_id == parent_id)
+        .collect::<Vec<_>>();
+    children.sort_by(|a, b| {
+        let kind_order = a.kind.cmp(&b.kind);
+        if kind_order == std::cmp::Ordering::Equal {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        } else {
+            kind_order
+        }
+    });
+
+    for node in children {
+        let is_folder = node.kind == "folder";
+        rows.push(json!({
+            "id": node.id,
+            "parent_id": node.parent_id,
+            "name": node.name,
+            "title": node.title.as_deref().unwrap_or(&node.name),
+            "kind": node.kind,
+            "is_folder": is_folder,
+            "is_note": node.kind == "note",
+            "hidden": node.hidden,
+            "draft": node.draft,
+            "depth": depth,
+            "indent": depth * 18,
+            "selected": Some(node.id) == selected_doc_id,
+            "ctime": node.ctime,
+            "mtime": node.mtime,
+        }));
+
+        if is_folder {
+            append_document_tree(nodes, Some(node.id), depth + 1, selected_doc_id, rows);
+        }
+    }
+}
+
+async fn save_editor_document(
+    pool: &SqlitePool,
+    doc_id: Option<i64>,
+    payload: &DraftPayload,
+) -> sqlx::Result<Option<i64>> {
+    if let Some(id) = doc_id {
+        let updated = documents::update_note(
+            pool,
+            id,
+            payload.name.as_deref(),
+            payload.parent_id,
+            Some(&payload.doc),
+            payload.draft,
+            payload.title.as_deref(),
+            payload.change_summary.as_deref(),
+        )
+        .await
+        .map_err(document_error_into_sqlx)?;
+
+        return Ok(updated.then_some(id));
+    }
+
+    documents::create_root_note(
+        pool,
+        &payload.doc,
+        payload.draft.unwrap_or(false),
+        payload.title.as_deref(),
+        payload.change_summary.as_deref(),
+    )
+    .await
+    .map(Some)
+    .map_err(document_error_into_sqlx)
+}
+
+fn document_json(document: &documents::StoredDocument) -> serde_json::Value {
+    json!({
+        "id": document.id,
+        "parent_id": document.parent_id,
+        "name": document.name,
+        "kind": document.kind,
+        "current_version_id": document.current_version_id,
+        "version_number": document.version_number,
+        "title": document.title,
+        "markdown": document.doc,
+        "hidden": document.hidden,
+        "draft": document.draft,
+        "ctime": document.ctime,
+        "mtime": document.mtime,
+    })
+}
+
+fn document_node_json(document: &documents::DocumentNode) -> serde_json::Value {
+    json!({
+        "id": document.id,
+        "parent_id": document.parent_id,
+        "name": document.name,
+        "kind": document.kind,
+        "current_version_id": document.current_version_id,
+        "title": document.title,
+        "hidden": document.hidden,
+        "draft": document.draft,
+        "ctime": document.ctime,
+        "mtime": document.mtime,
+    })
+}
+
+fn document_error_response(err: documents::DocumentError) -> HttpResponse {
+    match err {
+        documents::DocumentError::Domain(documents::DocumentErrorKind::FolderNotEmpty) => {
+            HttpResponse::Conflict().json(json!({
+                "error": "folder_not_empty",
+                "message": "Folder contains notes and cannot be deleted.",
+            }))
+        }
+        documents::DocumentError::Domain(documents::DocumentErrorKind::InvalidDocumentKind) => {
+            HttpResponse::BadRequest().json(json!({
+                "error": "invalid_document_kind",
+                "message": "Document type does not support this operation.",
+            }))
+        }
+        documents::DocumentError::Domain(documents::DocumentErrorKind::InvalidParent) => {
+            HttpResponse::BadRequest().json(json!({
+                "error": "invalid_parent",
+                "message": "Choose a valid destination folder.",
+            }))
+        }
+        documents::DocumentError::Sqlx(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+fn document_error_into_sqlx(err: documents::DocumentError) -> sqlx::Error {
+    match err {
+        documents::DocumentError::Sqlx(err) => err,
+        documents::DocumentError::Domain(kind) => sqlx::Error::Protocol(format!("{kind:?}")),
+    }
+}
+
+fn api_unauthorized() -> HttpResponse {
+    HttpResponse::Unauthorized().json(json!({
+        "error": "unauthorized",
+        "login_url": "/admin",
+    }))
 }
 
 fn redirect(location: &str) -> HttpResponse {
@@ -564,13 +1053,4 @@ fn document_label(id: i64, index_doc_id: Option<i64>) -> String {
     } else {
         format!("document-{id}.md")
     }
-}
-
-fn markdown_title(markdown: &str) -> Option<&str> {
-    markdown.lines().find_map(|line| {
-        let line = line.trim();
-        line.strip_prefix("# ")
-            .map(str::trim)
-            .filter(|title| !title.is_empty())
-    })
 }

@@ -34,6 +34,15 @@ function boot() {
   const submitButton = form?.querySelector<HTMLButtonElement>(
     "button[type='submit']"
   );
+  const noteName = document.querySelector<HTMLInputElement>(
+    "[data-trellis-note-name]"
+  );
+  const noteParent = document.querySelector<HTMLSelectElement>(
+    "[data-trellis-note-parent]"
+  );
+  const noteDraft = document.querySelector<HTMLInputElement>(
+    "[data-trellis-note-draft]"
+  );
   const initialDoc = trellisEditor ?? sourceView?.value ?? source?.value ?? "";
   // @ts-ignore
   const editor = new EditorView({
@@ -113,11 +122,17 @@ function boot() {
     try {
       const response = await fetch(saveUrl, {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ doc: markdown }),
+        body: JSON.stringify({
+          doc: markdown,
+          name: noteName?.value,
+          parent_id: noteParent?.value ? Number.parseInt(noteParent.value, 10) : null,
+          draft: noteDraft?.checked,
+        }),
       });
 
       if (response.status === 401) {

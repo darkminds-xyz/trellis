@@ -14,3 +14,21 @@ pub async fn run(pool: &SqlitePool) -> sqlx::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    #[tokio::test]
+    async fn migrations_can_run_more_than_once() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        run(&pool).await.unwrap();
+        run(&pool).await.unwrap();
+    }
+}

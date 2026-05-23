@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::{env, io};
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, http::header, web};
+use actix_web::{App, HttpServer, http::header, middleware, web};
 use handlebars::Handlebars;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use tokio::fs::File;
@@ -29,7 +29,10 @@ pub async fn run() -> io::Result<()> {
         .await
         .expect("Unable to create or load existing sqlite database!");
     let config = web::Data::new(config);
-    let admin_sessions = web::Data::new(auth::AdminSessions::new(pool.clone()));
+    let admin_sessions = web::Data::new(auth::AdminSessions::new(
+        pool.clone(),
+        config.admin.secure_cookies,
+    ));
     let admin_login_limiter = web::Data::new(auth::AdminLoginLimiter::default());
 
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
@@ -50,6 +53,7 @@ pub async fn run() -> io::Result<()> {
                     .allowed_methods(vec!["GET", "POST", "PATCH", "DELETE"])
                     .allowed_headers(vec![header::CONTENT_TYPE, header::ACCEPT]),
             )
+            .wrap(middleware::NormalizePath::trim())
             .configure(handlers::config)
     })
     .bind(server_addr)?
@@ -118,7 +122,10 @@ pub async fn get_db_pool(config: &AppConfig) -> anyhow::Result<SqlitePool> {
     }
 
     info!("Loading sqlite database: {}", &uri);
-    let options = uri.parse::<SqliteConnectOptions>()?.create_if_missing(true);
+    let options = uri
+        .parse::<SqliteConnectOptions>()?
+        .create_if_missing(true)
+        .foreign_keys(true);
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
     schemas::migrations::run(&pool).await?;
     schemas::accounts::seed_admin_from_config(&pool, &config.admin).await?;

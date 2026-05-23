@@ -24,6 +24,7 @@ const ADMIN_LOGIN_MAX_CONCURRENT_VERIFICATIONS: usize = 2;
 #[derive(Debug, Clone)]
 pub struct AdminSessions {
     pool: SqlitePool,
+    secure_cookies: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -91,8 +92,11 @@ impl AdminLoginLimiter {
 }
 
 impl AdminSessions {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(pool: SqlitePool, secure_cookies: bool) -> Self {
+        Self {
+            pool,
+            secure_cookies,
+        }
     }
 
     pub async fn create_session_cookie(&self) -> sqlx::Result<Cookie<'static>> {
@@ -113,9 +117,9 @@ impl AdminSessions {
         .await?;
 
         Ok(Cookie::build(ADMIN_SESSION_COOKIE, token)
-            .path("/admin")
+            .path("/")
             .http_only(true)
-            .secure(true)
+            .secure(self.secure_cookies)
             .same_site(SameSite::Strict)
             .max_age(ADMIN_SESSION_TTL)
             .finish())
@@ -158,9 +162,9 @@ impl AdminSessions {
         }
 
         Cookie::build(ADMIN_SESSION_COOKIE, "")
-            .path("/admin")
+            .path("/")
             .http_only(true)
-            .secure(true)
+            .secure(self.secure_cookies)
             .same_site(SameSite::Strict)
             .max_age(Duration::seconds(0))
             .finish()
@@ -197,7 +201,7 @@ mod tests {
             .await
             .unwrap();
 
-        AdminSessions::new(pool)
+        AdminSessions::new(pool, true)
     }
 
     #[actix_web::test]
@@ -218,9 +222,20 @@ mod tests {
         let req = actix_web::test::TestRequest::default()
             .cookie(cookie)
             .to_http_request();
-        let reloaded_sessions = AdminSessions::new(sessions.pool.clone());
+        let reloaded_sessions = AdminSessions::new(sessions.pool.clone(), true);
 
         assert!(reloaded_sessions.is_authenticated(&req).await);
+    }
+
+    #[actix_web::test]
+    async fn session_cookie_secure_flag_is_configurable() {
+        let sessions = test_sessions().await;
+        let secure_cookie = sessions.create_session_cookie().await.unwrap();
+        assert!(secure_cookie.secure().unwrap_or(false));
+
+        let local_sessions = AdminSessions::new(sessions.pool.clone(), false);
+        let local_cookie = local_sessions.create_session_cookie().await.unwrap();
+        assert!(!local_cookie.secure().unwrap_or(false));
     }
 
     #[actix_web::test]

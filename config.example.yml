@@ -8,6 +8,7 @@ database:
 admin:
   username: admin
   password: change-me
+  secure_cookies: true
 
 typography:
   body_font: Lato

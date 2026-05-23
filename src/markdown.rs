@@ -17,9 +17,102 @@ use rushdown_highlighting::{
     HighlightingHtmlRendererOptions, HighlightingMode, highlighting_html_renderer_extension,
 };
 use rushdown_link_attribute::link_attribute_parser_extension;
+use yaml_rust::YamlLoader;
 
 pub trait MarkdownHtmlRenderer {
     fn render_html(&self, markdown: &str) -> rushdown::Result<String>;
+}
+
+pub fn title_from_markdown(markdown: &str) -> Option<String> {
+    frontmatter_title(markdown).or_else(|| markdown_heading_title(markdown).map(str::to_string))
+}
+
+pub fn tags_from_markdown(markdown: &str) -> Vec<String> {
+    let Some(frontmatter) = frontmatter_yaml(markdown) else {
+        return Vec::new();
+    };
+    let tags_key = yaml_rust::Yaml::String("tags".to_string());
+    let Some(tags) = frontmatter.as_hash().and_then(|hash| hash.get(&tags_key)) else {
+        return Vec::new();
+    };
+
+    match tags {
+        yaml_rust::Yaml::Array(items) => items
+            .iter()
+            .filter_map(|item| item.as_str())
+            .map(str::trim)
+            .filter(|tag| !tag.is_empty())
+            .map(str::to_string)
+            .collect(),
+        yaml_rust::Yaml::String(value) => value
+            .split(',')
+            .map(str::trim)
+            .filter(|tag| !tag.is_empty())
+            .map(str::to_string)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+pub fn markdown_without_frontmatter(markdown: &str) -> &str {
+    let Some(rest) = markdown.strip_prefix("---") else {
+        return markdown;
+    };
+    let Some(rest) = rest
+        .strip_prefix('\n')
+        .or_else(|| rest.strip_prefix("\r\n"))
+    else {
+        return markdown;
+    };
+    let mut offset = markdown.len() - rest.len();
+    for line in rest.split_inclusive('\n') {
+        let trimmed = line.trim();
+        offset += line.len();
+        if trimmed == "---" {
+            return &markdown[offset..];
+        }
+    }
+
+    markdown
+}
+
+fn frontmatter_title(markdown: &str) -> Option<String> {
+    let title_key = yaml_rust::Yaml::String("title".to_string());
+    let frontmatter = frontmatter_yaml(markdown)?;
+    let title = frontmatter.as_hash()?.get(&title_key)?;
+    title
+        .as_str()
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .map(str::to_string)
+}
+
+fn frontmatter_yaml(markdown: &str) -> Option<yaml_rust::Yaml> {
+    let mut lines = markdown.lines();
+    if lines.next()?.trim() != "---" {
+        return None;
+    }
+
+    let mut yaml = String::new();
+    for line in lines {
+        if line.trim() == "---" {
+            return YamlLoader::load_from_str(&yaml).ok()?.into_iter().next();
+        }
+
+        yaml.push_str(line);
+        yaml.push('\n');
+    }
+
+    None
+}
+
+fn markdown_heading_title(markdown: &str) -> Option<&str> {
+    markdown.lines().find_map(|line| {
+        let line = line.trim();
+        line.strip_prefix("# ")
+            .map(str::trim)
+            .filter(|title| !title.is_empty())
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -103,7 +196,34 @@ impl MarkdownHtmlRenderer for RushdownMarkdownRenderer {
 
 #[cfg(test)]
 mod tests {
-    use super::{MarkdownHtmlRenderer, RushdownMarkdownRenderer};
+    use super::{MarkdownHtmlRenderer, RushdownMarkdownRenderer, title_from_markdown};
+
+    #[test]
+    fn title_from_markdown_uses_frontmatter_title_before_heading() {
+        let markdown = "---\ntitle: example\n---\n\n# Heading\n\nBody";
+
+        let title = title_from_markdown(markdown);
+
+        assert_eq!(title.as_deref(), Some("example"));
+    }
+
+    #[test]
+    fn title_from_markdown_falls_back_to_first_heading() {
+        let markdown = "# Heading\n\nBody";
+
+        let title = title_from_markdown(markdown);
+
+        assert_eq!(title.as_deref(), Some("Heading"));
+    }
+
+    #[test]
+    fn tags_from_markdown_reads_frontmatter_array() {
+        let markdown = "---\ntags:\n  - rust\n  - notes\n---\n\n# Heading";
+
+        let tags = super::tags_from_markdown(markdown);
+
+        assert_eq!(tags, vec!["rust", "notes"]);
+    }
 
     #[test]
     fn highlights_fenced_code_blocks() {

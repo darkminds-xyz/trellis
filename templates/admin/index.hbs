@@ -79,31 +79,125 @@
 
               {{#if is_list}}
                 <nav aria-label="Admin tools">
-                  <a href="/admin/edit/0">New post</a>
+                  <a href="/admin/edit/0">Write from scratch</a>
                   <a href="/admin/import">Images</a>
                 </nav>
-                {{#if has_posts}}
-                  <section class="admin-posts" aria-label="Posts">
-                    <h2>Posts</h2>
+
+                <section class="admin-manager" aria-label="Create documents">
+                  <form class="admin-inline-form" data-admin-create-folder>
+                    <h2>New folder</h2>
+                    <label>
+                      Name
+                      <input type="text" name="name" required placeholder="Projects" />
+                    </label>
+                    <label>
+                      Parent
+                      <select name="parent_id">
+                        {{#each folder_options}}
+                          <option value="{{id}}">{{label}}</option>
+                        {{/each}}
+                      </select>
+                    </label>
+                    <label class="admin-checkbox">
+                      <input type="checkbox" name="hidden" />
+                      Hidden from public view
+                    </label>
+                    <button type="submit">Create folder</button>
+                  </form>
+
+                  <form class="admin-inline-form" data-admin-create-note>
+                    <h2>New note</h2>
+                    <label>
+                      Name
+                      <input type="text" name="name" required placeholder="note.md" />
+                    </label>
+                    <label>
+                      Folder
+                      <select name="parent_id">
+                        {{#each folder_options}}
+                          <option value="{{id}}">{{label}}</option>
+                        {{/each}}
+                      </select>
+                    </label>
+                    <label class="admin-checkbox">
+                      <input type="checkbox" name="draft" checked />
+                      Draft
+                    </label>
+                    <button type="submit">Create note</button>
+                  </form>
+                </section>
+
+                {{#if has_document_tree}}
+                  <section class="admin-posts" aria-label="Documents">
+                    <h2>Documents</h2>
                     <ul>
-                      {{#each posts}}
-                        <li>
-                          <a
-                            class="admin-post-link{{#if selected}} selected{{/if}}"
-                            href="/admin/edit/{{id}}"
-                            {{#if selected}}aria-current="page"{{/if}}
-                          >
-                            <span>{{label}}</span>
-                            <small>{{title}}</small>
-                          </a>
+                      {{#each document_tree}}
+                        <li class="admin-document-row" style="--admin-depth: {{indent}}px">
+                          {{#if is_folder}}
+                            <form class="admin-document-card" data-admin-update-folder data-document-id="{{id}}" data-current-parent="{{parent_id}}">
+                              <div class="admin-document-main">
+                                <strong>Folder</strong>
+                                <label>
+                                  <span>Name</span>
+                                  <input type="text" name="name" value="{{name}}" required />
+                                </label>
+                                <label>
+                                  <span>Parent</span>
+                                  <select name="parent_id">
+                                    {{#each ../folder_options}}
+                                      <option value="{{id}}">{{label}}</option>
+                                    {{/each}}
+                                  </select>
+                                </label>
+                                <label class="admin-checkbox">
+                                  <input type="checkbox" name="hidden" {{#if hidden}}checked{{/if}} />
+                                  Hidden
+                                </label>
+                              </div>
+                              <div class="admin-document-actions">
+                                <button type="submit">Save</button>
+                                <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="folder">Delete</button>
+                              </div>
+                            </form>
+                          {{/if}}
+                          {{#if is_note}}
+                            <form class="admin-document-card{{#if selected}} selected{{/if}}" data-admin-update-note data-document-id="{{id}}" data-current-parent="{{parent_id}}">
+                              <div class="admin-document-main">
+                                <a href="/admin/edit/{{id}}">
+                                  <strong>{{title}}</strong>
+                                </a>
+                                <label>
+                                  <span>Name</span>
+                                  <input type="text" name="name" value="{{name}}" required />
+                                </label>
+                                <label>
+                                  <span>Folder</span>
+                                  <select name="parent_id">
+                                    {{#each ../folder_options}}
+                                      <option value="{{id}}">{{label}}</option>
+                                    {{/each}}
+                                  </select>
+                                </label>
+                                <label class="admin-checkbox">
+                                  <input type="checkbox" name="draft" {{#if draft}}checked{{/if}} />
+                                  Draft
+                                </label>
+                              </div>
+                              <div class="admin-document-actions">
+                                <a href="/admin/edit/{{id}}">Edit</a>
+                                <button type="submit">Save</button>
+                                <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="note">Delete</button>
+                              </div>
+                            </form>
+                          {{/if}}
                         </li>
                       {{/each}}
                     </ul>
                   </section>
                 {{else}}
-                  <section class="admin-posts" aria-label="Posts">
-                    <h2>Posts</h2>
-                    <p>No posts yet.</p>
+                  <section class="admin-posts" aria-label="Documents">
+                    <h2>Documents</h2>
+                    <p>No notes or folders yet.</p>
                   </section>
                 {{/if}}
               {{/if}}
@@ -152,6 +246,26 @@
                       </svg>
                     </button>
                   </div>
+                  <div class="admin-editor-meta">
+                    {{#if selected_doc_id}}
+                      <label>
+                        Name
+                        <input type="text" name="name" value="{{selected_doc_name}}" data-trellis-note-name required />
+                      </label>
+                      <label>
+                        Folder
+                        <select name="parent_id" data-trellis-note-parent>
+                          {{#each folder_options}}
+                            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                          {{/each}}
+                        </select>
+                      </label>
+                      <label class="admin-checkbox">
+                        <input type="checkbox" name="draft" data-trellis-note-draft {{#if selected_doc_is_draft}}checked{{/if}} />
+                        Draft
+                      </label>
+                    {{/if}}
+                  </div>
                   <input type="hidden" value="{{draft}}" data-trellis-editor-source />
                   <div id="trellis-editor" data-trellis-editor-view="prosemark"></div>
                   <textarea
@@ -188,6 +302,7 @@
     {{#if is_edit}}
       <script type="module" src="/static/editor.js"></script>
     {{/if}}
+    <script type="module" src="/static/admin.js"></script>
     <script type="module" src="/static/styles.js"></script>
   </body>
 </html>
