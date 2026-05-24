@@ -7,3 +7,4 @@ config.yml
 nginx/
 public/assets/
 AGENTS.md
+logo.svg
