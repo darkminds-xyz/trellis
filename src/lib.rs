@@ -10,6 +10,8 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
+use std::time::SystemTime;
 use std::{env, io};
 
 use actix_cors::Cors;
@@ -24,6 +26,8 @@ use crate::config::AppConfig;
 pub type WebTemplates = web::Data<Handlebars<'static>>;
 
 pub async fn run() -> io::Result<()> {
+    build_frontend_assets()?;
+
     let config = AppConfig::load().expect("Unable to load config.yml");
     let pool = get_db_pool(&config)
         .await
@@ -59,6 +63,157 @@ pub async fn run() -> io::Result<()> {
     .bind(server_addr)?
     .run()
     .await
+}
+
+fn build_frontend_assets() -> io::Result<()> {
+    let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let js_dir = project_dir.join("js");
+    if !js_dir.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "Unable to build Trellis frontend assets: expected JavaScript project at {}.",
+                js_dir.display()
+            ),
+        ));
+    }
+
+    if frontend_assets_are_current(project_dir, &js_dir)? {
+        info!("Trellis frontend assets are current; skipping `npm run build`.");
+        return Ok(());
+    }
+
+    ensure_command_available("node")?;
+    ensure_command_available("npm")?;
+
+    info!("Building Trellis frontend assets with `npm run build`...");
+    let output = Command::new("npm")
+        .arg("run")
+        .arg("build")
+        .current_dir(&js_dir)
+        .output()
+        .map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!(
+                    "Unable to start `npm run build` in {}: {err}\n\n{}",
+                    js_dir.display(),
+                    node_install_guidance()
+                ),
+            )
+        })?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(io::Error::other(format!(
+        "`npm run build` failed in {} with status {}.\n\nstdout:\n{}\n\nstderr:\n{}",
+        js_dir.display(),
+        output.status,
+        stdout.trim(),
+        stderr.trim()
+    )))
+}
+
+fn frontend_assets_are_current(project_dir: &Path, js_dir: &Path) -> io::Result<bool> {
+    let latest_input = latest_frontend_input_mtime(js_dir)?;
+    let Some(oldest_output) = oldest_frontend_output_mtime(project_dir)? else {
+        return Ok(false);
+    };
+
+    Ok(oldest_output >= latest_input)
+}
+
+fn latest_frontend_input_mtime(js_dir: &Path) -> io::Result<SystemTime> {
+    let mut latest = SystemTime::UNIX_EPOCH;
+    let source_dir = js_dir.join("src");
+
+    if source_dir.is_dir() {
+        for entry in WalkDir::new(&source_dir)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_file())
+        {
+            latest = latest.max(entry.metadata()?.modified()?);
+        }
+    }
+
+    for file_name in [
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "vite.config.ts",
+    ] {
+        let path = js_dir.join(file_name);
+        if path.is_file() {
+            latest = latest.max(fs::metadata(path)?.modified()?);
+        }
+    }
+
+    Ok(latest)
+}
+
+fn oldest_frontend_output_mtime(project_dir: &Path) -> io::Result<Option<SystemTime>> {
+    let assets_dir = project_dir.join("public").join("assets");
+    let required_outputs = [
+        "admin-shell.css",
+        "admin-shell.js",
+        "admin.js",
+        "editor.css",
+        "editor.js",
+        "graph.js",
+        "site.css",
+        "site.js",
+    ];
+
+    let mut oldest = None;
+    for file_name in required_outputs {
+        let path = assets_dir.join(file_name);
+        if !path.is_file() {
+            return Ok(None);
+        }
+
+        let modified = fs::metadata(path)?.modified()?;
+        oldest = Some(oldest.map_or(modified, |current: SystemTime| current.min(modified)));
+    }
+
+    Ok(oldest)
+}
+
+fn ensure_command_available(command: &str) -> io::Result<()> {
+    match Command::new(command).arg("--version").output() {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Err(io::Error::other(format!(
+                "`{command} --version` failed with status {}.\n\n{}\n\n{}",
+                output.status,
+                stderr.trim(),
+                node_install_guidance()
+            )))
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "Unable to build Trellis frontend assets because `{command}` is not installed or is not on PATH.\n\n{}",
+                node_install_guidance()
+            ),
+        )),
+        Err(err) => Err(io::Error::new(
+            err.kind(),
+            format!(
+                "Unable to check `{command}` before building frontend assets: {err}\n\n{}",
+                node_install_guidance()
+            ),
+        )),
+    }
+}
+
+fn node_install_guidance() -> &'static str {
+    "Install Node.js and npm before starting Trellis. On Linux, the recommended path is nvm: https://github.com/nvm-sh/nvm\nAfter installing nvm, install Node with `nvm install --lts`, restart your shell, and run Trellis again."
 }
 
 fn build_handlebars() -> Handlebars<'static> {

@@ -10,6 +10,7 @@ pub fn config(conf: &mut web::ServiceConfig) {
     let api_scope = web::scope("/api")
         .service(index::healthcheck_handler)
         .service(admin::list_documents)
+        .service(admin::preview_document)
         .service(admin::create_folder)
         .service(admin::update_folder)
         .service(admin::create_note)
@@ -33,7 +34,7 @@ pub fn config(conf: &mut web::ServiceConfig) {
         .service(index::virtual_note);
     conf.service(api_scope);
     conf.service(
-        Files::new("/static", "js/public/assets/")
+        Files::new("/static", "public/")
             .prefer_utf8(true)
             .use_last_modified(true),
     );

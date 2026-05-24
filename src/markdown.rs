@@ -26,7 +26,6 @@ use rushdown_footnote::{
 use rushdown_highlighting::{
     HighlightingHtmlRendererOptions, HighlightingMode, highlighting_html_renderer_extension,
 };
-use rushdown_link_attribute::link_attribute_parser_extension;
 use yaml_rust::YamlLoader;
 
 const EXTERNAL_LINK_ICON: &str = r#"<svg class="external-icon" viewBox="0 0 512 512"><path d="M320 0H288V64h32 82.7L201.4 265.4 178.7 288 224 333.3l22.6-22.6L448 109.3V192v32h64V192 32 0H480 320zM32 32H0V64 480v32H32 456h32V480 352 320H424v32 96H64V96h96 32V32H160 32z"></path></svg>"#;
@@ -63,6 +62,22 @@ pub fn tags_from_markdown(markdown: &str) -> Vec<String> {
             .map(str::to_string)
             .collect(),
         _ => Vec::new(),
+    }
+}
+
+pub fn toc_enabled(markdown: &str) -> bool {
+    let Some(frontmatter) = frontmatter_yaml(markdown) else {
+        return false;
+    };
+    let toc_key = yaml_rust::Yaml::String("toc".to_string());
+    let Some(value) = frontmatter.as_hash().and_then(|hash| hash.get(&toc_key)) else {
+        return false;
+    };
+
+    match value {
+        yaml_rust::Yaml::Boolean(enabled) => *enabled,
+        yaml_rust::Yaml::String(value) => value.trim().eq_ignore_ascii_case("true"),
+        _ => false,
     }
 }
 
@@ -169,10 +184,15 @@ impl RushdownMarkdownRenderer {
         rushdown_meta::meta_parser_extension(rushdown_meta::MetaParserOptions::default())
             .and(footnote_parser_extension())
             .and(diagram_parser_extension(DiagramParserOptions::default()))
-            .and(link_attribute_parser_extension())
             .and(callout_parser_extension())
             .and(parser::gfm_table())
             .and(parser::gfm_task_list_item())
+            .and(parser::gfm_linkify(parser::LinkifyOptions {
+                allowed_protocols: vec!["http".to_string(), "https".to_string()],
+                www_scanner: Box::new(|_: &[u8]| None),
+                email_scanner: Box::new(|_: &[u8]| None),
+                ..parser::LinkifyOptions::default()
+            }))
     }
 
     fn renderer_extensions(&self) -> impl RendererExtension<'_> {
@@ -1074,6 +1094,20 @@ mod tests {
     }
 
     #[test]
+    fn toc_enabled_reads_frontmatter_boolean() {
+        let markdown = "---\ntoc: true\n---\n\n# Heading";
+
+        assert!(super::toc_enabled(markdown));
+    }
+
+    #[test]
+    fn toc_enabled_defaults_to_false() {
+        let markdown = "# Heading";
+
+        assert!(!super::toc_enabled(markdown));
+    }
+
+    #[test]
     fn highlights_fenced_code_blocks() {
         let html = RushdownMarkdownRenderer::new()
             .render_html("```rust\nlet a = 10;\n```")
@@ -1333,6 +1367,30 @@ graph LR
             ),
             "{html}",
         );
+    }
+
+    #[test]
+    fn linkifies_raw_http_urls_as_external_links() {
+        let html = RushdownMarkdownRenderer::new()
+            .render_html("- https://a-website-is-a-room.net/\n")
+            .expect("markdown should render");
+
+        assert!(
+            html.contains(
+                r#"<li><p><a href="https://a-website-is-a-room.net/" class="external">https://a-website-is-a-room.net/<svg class="external-icon""#
+            ),
+            "{html}",
+        );
+    }
+
+    #[test]
+    fn does_not_linkify_raw_email_addresses() {
+        let html = RushdownMarkdownRenderer::new()
+            .render_html("contact@example.com")
+            .expect("markdown should render");
+
+        assert!(html.contains("<p>contact@example.com</p>"), "{html}");
+        assert!(!html.contains("<a href="), "{html}");
     }
 
     #[test]

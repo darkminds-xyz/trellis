@@ -13,7 +13,7 @@ use crate::{
     config::AppConfig,
     markdown::{
         MarkdownHtmlRenderer, RushdownMarkdownRenderer, markdown_without_frontmatter,
-        tags_from_markdown, title_from_markdown,
+        tags_from_markdown, title_from_markdown, toc_enabled,
     },
     schemas::documents,
     typography::Typography,
@@ -57,6 +57,7 @@ pub async fn index(
                 None,
                 None,
                 None,
+                Vec::new(),
                 Vec::new(),
             ),
             StatusCode::OK,
@@ -158,6 +159,11 @@ fn render_document(
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
     let title = document_title(document);
+    let toc_items = if toc_enabled(&document.doc) {
+        toc_items_from_html(&html)
+    } else {
+        Vec::new()
+    };
 
     render_with_styles(
         hb,
@@ -171,6 +177,7 @@ fn render_document(
             document.ctime.as_deref(),
             document.mtime.as_deref(),
             nav,
+            toc_items,
         ),
         StatusCode::OK,
     )
@@ -182,7 +189,7 @@ fn render_with_styles(
     mut data: serde_json::Value,
     status: StatusCode,
 ) -> HttpResponse {
-    match fs::read_to_string("js/public/assets/styles.css") {
+    match fs::read_to_string("public/assets/site.css") {
         Ok(styles) => {
             data["styles"] = json!(styles);
             render(hb, template, data, HttpResponseBuilder::new(status))
@@ -200,9 +207,11 @@ fn page_data(
     created: Option<&str>,
     updated: Option<&str>,
     nav: Vec<serde_json::Value>,
+    toc_items: Vec<serde_json::Value>,
 ) -> serde_json::Value {
     let html = article_html.unwrap_or_default();
     let typography = Typography::from_config(&config.typography);
+    let has_toc = !toc_items.is_empty();
 
     json!({
         "styles": "",
@@ -221,6 +230,10 @@ fn page_data(
             "read_time": read_time(&html),
             "tags": [],
             "html": html,
+            "toc": {
+                "enabled": has_toc,
+                "items": toc_items,
+            },
         },
         "footer": {
             "version": env!("CARGO_PKG_VERSION"),
@@ -459,6 +472,30 @@ fn normalize_internal_link(link: &str, context: &PublicDocuments) -> Option<Stri
     }
 }
 
+fn toc_items_from_html(html: &str) -> Vec<serde_json::Value> {
+    let heading_re =
+        Regex::new(r#"(?is)<h([1-6])\b([^>]*)>(.*?)</h[1-6]>"#).expect("valid heading regex");
+    let id_re = Regex::new(r#"(?i)\bid\s*=\s*"([^"]+)""#).expect("valid id regex");
+
+    heading_re
+        .captures_iter(html)
+        .filter_map(|capture| {
+            let depth = capture.get(1)?.as_str().parse::<u8>().ok()?;
+            let attributes = capture.get(2)?.as_str();
+            let id = id_re.captures(attributes)?.get(1)?.as_str().to_string();
+            let title = html_fragment_to_text(capture.get(3)?.as_str());
+
+            (!id.is_empty() && !title.is_empty()).then(|| {
+                json!({
+                    "id": id,
+                    "title": title,
+                    "depth": depth.saturating_sub(1),
+                })
+            })
+        })
+        .collect()
+}
+
 fn html_to_text(html: &str) -> String {
     let mut text = String::new();
     let mut in_tag = false;
@@ -479,6 +516,22 @@ fn html_to_text(html: &str) -> String {
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn html_fragment_to_text(html: &str) -> String {
+    decode_html_entities(&html_to_text(html))
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn decode_html_entities(value: &str) -> String {
+    value
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
 }
 
 fn note_slug_part(name: &str) -> String {
@@ -535,5 +588,23 @@ fn render(
     match hb.render(template, &data) {
         Ok(body) => builder.content_type("text/html; charset=utf-8").body(body),
         Err(err) => HttpResponse::InternalServerError().body(format!("Template error: {}", err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn toc_items_from_html_collects_rendered_headings() {
+        let items = super::toc_items_from_html(
+            r#"<h1 id="intro">Intro</h1><p>Body</p><h3 id="deep">Deep <code>API</code></h3>"#,
+        );
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0]["id"], "intro");
+        assert_eq!(items[0]["title"], "Intro");
+        assert_eq!(items[0]["depth"], 0);
+        assert_eq!(items[1]["id"], "deep");
+        assert_eq!(items[1]["title"], "Deep API");
+        assert_eq!(items[1]["depth"], 2);
     }
 }

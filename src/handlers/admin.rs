@@ -16,7 +16,7 @@ use crate::{
     WebTemplates,
     auth::{AdminLoginLimiter, AdminSessions},
     config::AppConfig,
-    markdown::title_from_markdown,
+    markdown::{MarkdownHtmlRenderer, RushdownMarkdownRenderer, title_from_markdown},
     schemas::{accounts, documents, images},
     typography::Typography,
 };
@@ -44,6 +44,11 @@ pub struct DraftPayload {
     parent_id: Option<Option<i64>>,
     title: Option<String>,
     change_summary: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PreviewPayload {
+    doc: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -255,6 +260,29 @@ pub async fn save_document(
         }
         Ok(None) => HttpResponse::new(StatusCode::NOT_FOUND),
         Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[post("/admin/preview")]
+pub async fn preview_document(
+    req: HttpRequest,
+    payload: web::Json<PreviewPayload>,
+    sessions: web::Data<AdminSessions>,
+) -> impl Responder {
+    if !sessions.is_authenticated(&req).await {
+        return HttpResponse::Unauthorized().json(json!({
+            "error": "unauthorized",
+            "login_url": "/admin",
+        }));
+    }
+
+    let renderer = RushdownMarkdownRenderer::new();
+    match renderer.render_html(&payload.doc) {
+        Ok(html) => HttpResponse::Ok().json(json!({ "html": html })),
+        Err(_) => HttpResponse::BadRequest().json(json!({
+            "error": "render_failed",
+            "message": "Unable to render preview.",
+        })),
     }
 }
 
@@ -713,6 +741,17 @@ fn admin_data(
         selected.as_ref().and_then(|document| document.parent_id),
     );
     let document_tree = document_tree(&nodes, selected_doc_id);
+    let notes_count = nodes.iter().filter(|node| node.kind == "note").count();
+    let folder_count = nodes.iter().filter(|node| node.kind == "folder").count();
+    let draft_count = nodes
+        .iter()
+        .filter(|node| node.kind == "note" && node.draft)
+        .count();
+    let published_count = nodes
+        .iter()
+        .filter(|node| node.kind == "note" && !node.draft && !node.hidden)
+        .count();
+    let hidden_count = nodes.iter().filter(|node| node.hidden).count();
     let images = images
         .iter()
         .map(|image| {
@@ -783,6 +822,11 @@ fn admin_data(
         "has_posts": !posts.is_empty(),
         "document_tree": document_tree,
         "has_document_tree": !nodes.is_empty(),
+        "notes_count": notes_count,
+        "folder_count": folder_count,
+        "draft_count": draft_count,
+        "published_count": published_count,
+        "hidden_count": hidden_count,
         "folder_options": folder_options,
         "selected_doc_name": selected_doc_name,
         "selected_doc_parent_id": selected_doc_parent_id,
@@ -803,8 +847,8 @@ fn render_with_styles(
     mut data: serde_json::Value,
     status: StatusCode,
 ) -> HttpResponse {
-    let styles = fs::read_to_string("js/public/assets/styles.css").unwrap_or_default();
-    let editor_styles = fs::read_to_string("js/public/assets/editor.css").unwrap_or_default();
+    let styles = fs::read_to_string("public/assets/admin-shell.css").unwrap_or_default();
+    let editor_styles = fs::read_to_string("public/assets/editor.css").unwrap_or_default();
     data["styles"] = json!(styles);
     data["editor_styles"] = json!(editor_styles);
 
@@ -876,6 +920,12 @@ fn append_document_tree(
     selected_doc_id: Option<i64>,
     rows: &mut Vec<serde_json::Value>,
 ) {
+    let parent_name = parent_id.and_then(|id| {
+        nodes
+            .iter()
+            .find(|node| node.id == id)
+            .map(|node| node.name.as_str())
+    });
     let mut children = nodes
         .iter()
         .filter(|node| node.parent_id == parent_id)
@@ -891,16 +941,37 @@ fn append_document_tree(
 
     for node in children {
         let is_folder = node.kind == "folder";
+        let child_count = nodes
+            .iter()
+            .filter(|child| child.parent_id == Some(node.id))
+            .count();
+        let note_count = nodes
+            .iter()
+            .filter(|child| child.parent_id == Some(node.id) && child.kind == "note")
+            .count();
         rows.push(json!({
             "id": node.id,
             "parent_id": node.parent_id,
+            "parent_name": parent_name.unwrap_or("Root"),
             "name": node.name,
             "title": node.title.as_deref().unwrap_or(&node.name),
             "kind": node.kind,
             "is_folder": is_folder,
             "is_note": node.kind == "note",
+            "child_count": child_count,
+            "note_count": note_count,
+            "has_children": child_count > 0,
             "hidden": node.hidden,
             "draft": node.draft,
+            "status": if node.hidden {
+                "Hidden"
+            } else if node.kind == "note" && node.draft {
+                "Draft"
+            } else if node.kind == "note" {
+                "Published"
+            } else {
+                "Folder"
+            },
             "depth": depth,
             "indent": depth * 18,
             "selected": Some(node.id) == selected_doc_id,
