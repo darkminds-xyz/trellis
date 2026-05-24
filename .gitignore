@@ -6,3 +6,4 @@ trellis.db
 config.yml
 nginx/
 public/assets/
+AGENTS.md
