@@ -4,6 +4,8 @@
   id="overlay-explorer-button"
   class="overlay-explorer-toggle mobile-only"
   aria-controls="overlay-explorer-content"
+  aria-expanded="false"
+  aria-label="Open Xplorer"
   data-olsavestate="{{explorer.use_saved_state}}"
   data-behavior="{{explorer.folder_click_behavior}}"
   data-collapsed="{{explorer.folder_default_state}}"
@@ -25,8 +27,27 @@
 
 <div id="overlay-explorer-container" aria-hidden="true">
   <div id="overlay-explorer-space">
-    <div id="overlay-explorer-content">
-      <h2 style="">{{explorer.title}}</h2>
+    <div id="overlay-explorer-content" role="dialog" aria-modal="true" aria-labelledby="overlay-explorer-title">
+      <div class="overlay-explorer-header">
+        <h2 id="overlay-explorer-title">{{explorer.title}}</h2>
+        <button type="button" class="overlay-explorer-close" aria-label="Close Xplorer" data-overlay-explorer-close>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
 
       <ul id="overlay-explorer-ul">
         {{#if nav}}

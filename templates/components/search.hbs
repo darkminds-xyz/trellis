@@ -1,0 +1,83 @@
+<div class="site-search" data-site-search>
+  <button
+    type="button"
+    class="site-search-trigger"
+    aria-haspopup="dialog"
+    aria-controls="site-search-modal"
+    data-site-search-open
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.3-4.3"></path>
+    </svg>
+    <span>Search posts</span>
+  </button>
+
+  <div
+    id="site-search-modal"
+    class="site-search-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="site-search-label"
+    aria-hidden="true"
+    data-site-search-modal
+  >
+    <div class="site-search-panel">
+      <label id="site-search-label" class="site-search-label" for="site-search-input">Search posts</label>
+      <div class="site-search-input-row">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.3-4.3"></path>
+        </svg>
+        <input
+          id="site-search-input"
+          type="search"
+          autocomplete="off"
+          placeholder="Search all posts..."
+          data-site-search-input
+        />
+        <button type="button" class="site-search-close" aria-label="Close search" data-site-search-close>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="site-search-status" data-site-search-status>Start typing to search every post.</div>
+      <ol class="site-search-results" data-site-search-results></ol>
+    </div>
+  </div>
+</div>

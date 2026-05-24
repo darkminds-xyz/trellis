@@ -154,7 +154,11 @@ body[data-slug="admin"] {
   }
 
   .admin-list-shell {
-    display: block;
+    min-height: 0;
+    height: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .admin-list-sidebar {
@@ -551,6 +555,7 @@ body[data-slug="admin"] {
     .center > article,
     .page-content,
     .admin-edit-content,
+    .admin-list-shell,
     .admin-list-main,
     .admin-document-workbench,
     .admin-document-table {

@@ -24,18 +24,72 @@
             <a href="/">
               <h1 class="page-title">{{site.name}}</h1>
             </a>
+            {{#if site.tagline}}
+              <p>{{site.tagline}}</p>
+            {{/if}}
+            {{> components/search}}
             <div data-theme-toggle>{{> components/theme-toggle}}</div>
           </div>
+
+          {{#if is_list}}
+            <nav class="admin-list-sidebar" aria-label="Archive navigation">
+              <div class="admin-rail-header">
+                <a class="admin-primary-action" href="/admin/edit/0">New post</a>
+              </div>
+              <div class="admin-side-nav" aria-label="Post filters">
+                <button type="button" class="active" data-admin-filter="all"><span>All posts</span><strong>{{notes_count}}</strong></button>
+                <button type="button" data-admin-filter="draft"><span>Drafts</span><strong>{{draft_count}}</strong></button>
+                <button type="button" data-admin-filter="published"><span>Published</span><strong>{{published_count}}</strong></button>
+                <a href="/admin/import"><span>Images</span></a>
+                <button type="button" data-admin-filter="hidden"><span>Hidden</span><strong>{{hidden_count}}</strong></button>
+              </div>
+              <div class="admin-rail-section">
+                <div class="admin-rail-title">
+                  <span>Folder tree</span>
+                  <strong>{{folder_count}}</strong>
+                </div>
+                <ol class="admin-rail-tree" aria-label="Folders and notes">
+                  {{#each document_tree}}
+                    <li
+                      class="admin-rail-node{{#if is_folder}} is-folder{{/if}}{{#if is_note}} is-note{{/if}}{{#if selected}} active{{/if}}"
+                      style="--admin-depth: {{depth}}"
+                      data-admin-rail-node
+                      data-admin-row-id="{{id}}"
+                      data-admin-parent-id="{{parent_id}}"
+                      data-admin-kind="{{kind}}"
+                    >
+                      {{#if is_folder}}
+                        <button type="button" class="admin-tree-toggle" data-admin-folder-toggle data-admin-folder-id="{{id}}" aria-label="Toggle {{name}}">
+                          <span aria-hidden="true">▸</span>
+                        </button>
+                        <button type="button" class="admin-tree-label" data-admin-folder-filter="{{id}}">{{name}}</button>
+                        <span class="admin-tree-count">{{note_count}}</span>
+                      {{/if}}
+                      {{#if is_note}}
+                        <a class="admin-tree-note" href="/admin/edit/{{id}}">{{title}}</a>
+                      {{/if}}
+                    </li>
+                  {{/each}}
+                </ol>
+              </div>
+            </nav>
+          {{else}}
+            <nav class="admin-list-sidebar" aria-label="Admin navigation">
+              <div class="admin-side-nav">
+                <a href="/admin/list"><span>Posts</span></a>
+                <a href="/admin/import"><span>Images</span></a>
+                <a class="admin-primary-action" href="/admin/edit/0">New post</a>
+              </div>
+            </nav>
+          {{/if}}
+          <form class="admin-sidebar-footer" action="/admin/logout" method="post">
+            <button type="submit">Sign out</button>
+          </form>
         </aside>
 
         <main class="center">
           <article>
-            <header class="page-header">
-              <h1 class="page-title">Admin</h1>
-              <p class="content-meta">Private publishing tools</p>
-            </header>
-
-            <section class="page-content">
+            <section class="page-content{{#if is_edit}} admin-edit-content{{/if}}">
               {{#if error}}
                 <p role="alert">{{error}}</p>
               {{/if}}
@@ -78,135 +132,187 @@
               {{/if}}
 
               {{#if is_list}}
-                <nav aria-label="Admin tools">
-                  <a href="/admin/edit/0">Write from scratch</a>
-                  <a href="/admin/import">Images</a>
-                </nav>
+                <div class="admin-list-shell">
+                  <div class="admin-list-main">
+                    <div class="admin-list-heading">
+                      <div>
+                        <h2>Publishing workbench</h2>
+                        <p>Archive structure, document state, and public visibility.</p>
+                      </div>
+                      <div class="admin-list-tools" aria-label="List tools">
+                        <label>
+                          <span class="sr-only">Search posts</span>
+                          <input type="search" placeholder="Search posts..." />
+                        </label>
+                        <select aria-label="Sort posts">
+                          <option>Latest first</option>
+                          <option>Oldest first</option>
+                          <option>Name</option>
+                        </select>
+                      </div>
+                    </div>
 
-                <section class="admin-manager" aria-label="Create documents">
-                  <form class="admin-inline-form" data-admin-create-folder>
-                    <h2>New folder</h2>
-                    <label>
-                      Name
-                      <input type="text" name="name" required placeholder="Projects" />
-                    </label>
-                    <label>
-                      Parent
-                      <select name="parent_id">
-                        {{#each folder_options}}
-                          <option value="{{id}}">{{label}}</option>
-                        {{/each}}
-                      </select>
-                    </label>
-                    <label class="admin-checkbox">
-                      <input type="checkbox" name="hidden" />
-                      Hidden from public view
-                    </label>
-                    <button type="submit">Create folder</button>
-                  </form>
+                    <div class="admin-command-row">
+                      <details class="admin-command">
+                        <summary>New folder</summary>
+                        <form class="admin-inline-form" data-admin-create-folder>
+                          <label>
+                            Name
+                            <input type="text" name="name" required placeholder="Projects" />
+                          </label>
+                          <label>
+                            Parent
+                            <select name="parent_id">
+                              {{#each folder_options}}
+                                <option value="{{id}}">{{label}}</option>
+                              {{/each}}
+                            </select>
+                          </label>
+                          <label class="admin-checkbox">
+                            <input type="checkbox" name="hidden" />
+                            Hidden
+                          </label>
+                          <button type="submit">Create folder</button>
+                        </form>
+                      </details>
 
-                  <form class="admin-inline-form" data-admin-create-note>
-                    <h2>New note</h2>
-                    <label>
-                      Name
-                      <input type="text" name="name" required placeholder="note.md" />
-                    </label>
-                    <label>
-                      Folder
-                      <select name="parent_id">
-                        {{#each folder_options}}
-                          <option value="{{id}}">{{label}}</option>
-                        {{/each}}
-                      </select>
-                    </label>
-                    <label class="admin-checkbox">
-                      <input type="checkbox" name="draft" checked />
-                      Draft
-                    </label>
-                    <button type="submit">Create note</button>
-                  </form>
-                </section>
+                      <details class="admin-command">
+                        <summary>New note</summary>
+                        <form class="admin-inline-form" data-admin-create-note>
+                          <label>
+                            Name
+                            <input type="text" name="name" required placeholder="note.md" />
+                          </label>
+                          <label>
+                            Folder
+                            <select name="parent_id">
+                              {{#each folder_options}}
+                                <option value="{{id}}">{{label}}</option>
+                              {{/each}}
+                            </select>
+                          </label>
+                          <label class="admin-checkbox">
+                            <input type="checkbox" name="draft" checked />
+                            Draft
+                          </label>
+                          <button type="submit">Create note</button>
+                        </form>
+                      </details>
+                    </div>
 
-                {{#if has_document_tree}}
-                  <section class="admin-posts" aria-label="Documents">
-                    <h2>Documents</h2>
-                    <ul>
-                      {{#each document_tree}}
-                        <li class="admin-document-row" style="--admin-depth: {{indent}}px">
-                          {{#if is_folder}}
-                            <form class="admin-document-card" data-admin-update-folder data-document-id="{{id}}" data-current-parent="{{parent_id}}">
-                              <div class="admin-document-main">
-                                <strong>Folder</strong>
-                                <label>
-                                  <span>Name</span>
-                                  <input type="text" name="name" value="{{name}}" required />
-                                </label>
-                                <label>
-                                  <span>Parent</span>
-                                  <select name="parent_id">
-                                    {{#each ../folder_options}}
-                                      <option value="{{id}}">{{label}}</option>
-                                    {{/each}}
-                                  </select>
-                                </label>
-                                <label class="admin-checkbox">
-                                  <input type="checkbox" name="hidden" {{#if hidden}}checked{{/if}} />
-                                  Hidden
-                                </label>
+                    {{#if has_document_tree}}
+                      <section class="admin-posts admin-document-workbench" aria-label="Documents">
+                        <div class="admin-section-heading">
+                          <h2>Documents</h2>
+                          <p>Showing {{notes_count}} notes and {{folder_count}} folders</p>
+                        </div>
+                        <div class="admin-document-table" role="table" aria-label="Publishing archive">
+                          <div class="admin-document-table-head" role="row">
+                            <span>Document</span>
+                            <span>Status</span>
+                            <span>Parent</span>
+                            <span>Updated</span>
+                            <span>Actions</span>
+                          </div>
+                          <div class="admin-document-table-body">
+                            {{#each document_tree}}
+                              <div
+                                class="admin-document-row{{#if is_folder}} is-folder{{/if}}{{#if is_note}} is-note{{/if}}"
+                                style="--admin-depth: {{depth}}"
+                                data-admin-row
+                                data-admin-row-id="{{id}}"
+                                data-admin-parent-id="{{parent_id}}"
+                                data-admin-kind="{{kind}}"
+                                data-admin-draft="{{draft}}"
+                                data-admin-hidden="{{hidden}}"
+                              >
+                                {{#if is_folder}}
+                                  <form class="admin-document-card admin-folder-card" data-admin-update-folder data-document-id="{{id}}" data-current-parent="{{parent_id}}">
+                                    <div class="admin-document-cell admin-document-name">
+                                      <button type="button" class="admin-table-toggle" data-admin-folder-toggle data-admin-folder-id="{{id}}" aria-label="Toggle {{name}}">
+                                        <span aria-hidden="true">▸</span>
+                                      </button>
+                                      <button type="button" class="admin-folder-name" data-admin-folder-filter="{{id}}" data-admin-folder-name-text>{{name}}</button>
+                                      <input class="admin-folder-rename" type="text" name="name" value="{{name}}" required data-admin-folder-name-input hidden />
+                                      <span class="admin-count">{{note_count}} notes</span>
+                                    </div>
+                                    <div class="admin-document-cell">
+                                      <span class="admin-status-pill">Folder</span>
+                                      {{#if hidden}}<span class="admin-status-pill muted">Hidden</span>{{/if}}
+                                    </div>
+                                    <div class="admin-document-cell admin-muted">{{parent_name}}</div>
+                                    <div class="admin-document-cell admin-muted">{{mtime}}</div>
+                                    <div class="admin-document-actions">
+                                      <label class="admin-checkbox admin-row-checkbox">
+                                        <input type="checkbox" name="hidden" {{#if hidden}}checked{{/if}} />
+                                        Hidden
+                                      </label>
+                                      <select name="parent_id" aria-label="Parent folder">
+                                        {{#each ../folder_options}}
+                                          <option value="{{id}}">{{label}}</option>
+                                        {{/each}}
+                                      </select>
+                                      <button type="submit">Save</button>
+                                      <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="folder">Delete</button>
+                                    </div>
+                                  </form>
+                                {{/if}}
+                                {{#if is_note}}
+                                  <form class="admin-document-card{{#if selected}} selected{{/if}}" data-admin-update-note data-document-id="{{id}}" data-current-parent="{{parent_id}}">
+                                    <div class="admin-document-cell admin-document-name">
+                                      <span class="admin-note-indent" aria-hidden="true"></span>
+                                      <a href="/admin/edit/{{id}}">
+                                        <strong>{{title}}</strong>
+                                        <small>{{name}}</small>
+                                      </a>
+                                      <input type="hidden" name="name" value="{{name}}" required />
+                                    </div>
+                                    <div class="admin-document-cell">
+                                      {{#if draft}}
+                                        <span class="admin-status-pill muted">Draft</span>
+                                      {{else}}
+                                        <span class="admin-status-pill">Published</span>
+                                      {{/if}}
+                                      {{#if hidden}}<span class="admin-status-pill muted">Hidden</span>{{/if}}
+                                    </div>
+                                    <div class="admin-document-cell admin-muted">{{parent_name}}</div>
+                                    <div class="admin-document-cell admin-muted">{{mtime}}</div>
+                                    <div class="admin-document-actions">
+                                      <a href="/admin/edit/{{id}}">Edit</a>
+                                      <label class="admin-checkbox admin-row-checkbox">
+                                        <input type="checkbox" name="draft" {{#if draft}}checked{{/if}} />
+                                        Draft
+                                      </label>
+                                      <select name="parent_id" aria-label="Folder">
+                                        {{#each ../folder_options}}
+                                          <option value="{{id}}">{{label}}</option>
+                                        {{/each}}
+                                      </select>
+                                      <button type="submit">Save</button>
+                                      <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="note">Delete</button>
+                                    </div>
+                                  </form>
+                                {{/if}}
                               </div>
-                              <div class="admin-document-actions">
-                                <button type="submit">Save</button>
-                                <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="folder">Delete</button>
-                              </div>
-                            </form>
-                          {{/if}}
-                          {{#if is_note}}
-                            <form class="admin-document-card{{#if selected}} selected{{/if}}" data-admin-update-note data-document-id="{{id}}" data-current-parent="{{parent_id}}">
-                              <div class="admin-document-main">
-                                <a href="/admin/edit/{{id}}">
-                                  <strong>{{title}}</strong>
-                                </a>
-                                <label>
-                                  <span>Name</span>
-                                  <input type="text" name="name" value="{{name}}" required />
-                                </label>
-                                <label>
-                                  <span>Folder</span>
-                                  <select name="parent_id">
-                                    {{#each ../folder_options}}
-                                      <option value="{{id}}">{{label}}</option>
-                                    {{/each}}
-                                  </select>
-                                </label>
-                                <label class="admin-checkbox">
-                                  <input type="checkbox" name="draft" {{#if draft}}checked{{/if}} />
-                                  Draft
-                                </label>
-                              </div>
-                              <div class="admin-document-actions">
-                                <a href="/admin/edit/{{id}}">Edit</a>
-                                <button type="submit">Save</button>
-                                <button type="button" data-admin-delete-document data-document-id="{{id}}" data-document-kind="note">Delete</button>
-                              </div>
-                            </form>
-                          {{/if}}
-                        </li>
-                      {{/each}}
-                    </ul>
-                  </section>
-                {{else}}
-                  <section class="admin-posts" aria-label="Documents">
-                    <h2>Documents</h2>
-                    <p>No notes or folders yet.</p>
-                  </section>
-                {{/if}}
+                            {{/each}}
+                          </div>
+                        </div>
+                      </section>
+                    {{else}}
+                      <section class="admin-posts" aria-label="Documents">
+                        <h2>Documents</h2>
+                        <p>No notes or folders yet.</p>
+                      </section>
+                    {{/if}}
+                  </div>
+                </div>
               {{/if}}
 
               {{#if is_edit}}
                 <nav aria-label="Admin tools">
                   <a href="/admin/list">Posts</a>
                 </nav>
-                <form data-trellis-editor-form data-save-url="/admin/edit/{{#if selected_doc_id}}{{selected_doc_id}}{{else}}0{{/if}}">
+                <form class="admin-editor-form" data-trellis-editor-form data-save-url="/admin/edit/{{#if selected_doc_id}}{{selected_doc_id}}{{else}}0{{/if}}">
                   <div class="admin-editor-header">
                     <h2>
                       {{#if selected_doc_label}}
@@ -245,6 +351,12 @@
                         <path d="M14 4l-4 16" />
                       </svg>
                     </button>
+                    <button
+                      type="button"
+                      class="admin-editor-preview"
+                      data-trellis-preview-toggle
+                      aria-pressed="false"
+                    >Preview</button>
                   </div>
                   <div class="admin-editor-meta">
                     {{#if selected_doc_id}}
@@ -268,6 +380,12 @@
                   </div>
                   <input type="hidden" value="{{draft}}" data-trellis-editor-source />
                   <div id="trellis-editor" data-trellis-editor-view="prosemark"></div>
+                  <section
+                    class="admin-editor-preview-pane page-content"
+                    data-renderer="rushdown"
+                    data-trellis-preview
+                    hidden
+                  ></section>
                   <textarea
                     class="admin-source-editor"
                     rows="16"
@@ -289,20 +407,16 @@
                 </form>
               {{/if}}
 
-              <form action="/admin/logout" method="post">
-                <button type="submit">Sign out</button>
-              </form>
             </section>
           </article>
         </main>
 
-        <aside class="right sidebar"></aside>
       </div>
     </div>
     {{#if is_edit}}
-      <script type="module" src="/static/editor.js"></script>
+      <script type="module" src="/static/assets/editor.js"></script>
     {{/if}}
-    <script type="module" src="/static/admin.js"></script>
-    <script type="module" src="/static/styles.js"></script>
+    <script type="module" src="/static/assets/admin-shell.js"></script>
+    <script type="module" src="/static/assets/admin.js"></script>
   </body>
 </html>

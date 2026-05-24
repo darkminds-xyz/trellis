@@ -3,6 +3,7 @@
     <div
       class="ol-folder-entry"
       data-ol-selector-for="{{folder_path}}"
+      aria-expanded="{{#if open}}true{{else}}false{{/if}}"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -37,6 +38,7 @@
   <li>
     <a
       href="/{{path}}"
+      class="{{#if active}}active{{/if}}"
       {{#if active}}aria-current="page"{{/if}}
     >{{title}}</a>
   </li>

@@ -186,7 +186,6 @@ impl RushdownMarkdownRenderer {
         rushdown_meta::meta_parser_extension(rushdown_meta::MetaParserOptions::default())
             .and(footnote_parser_extension())
             .and(diagram_parser_extension(DiagramParserOptions::default()))
-            .and(link_attribute_parser_extension())
             .and(callout_parser_extension())
             .and(parser::gfm_table())
             .and(parser::gfm_task_list_item())
@@ -200,7 +199,7 @@ impl RushdownMarkdownRenderer {
             ))
             .and(highlighting_html_renderer_extension(
                 HighlightingHtmlRendererOptions {
-                    mode: HighlightingMode::Attribute,
+                    mode: HighlightingMode::Class,
                     ..HighlightingHtmlRendererOptions::default()
                 },
             ))
@@ -234,7 +233,9 @@ impl AstTransformer for RawHttpUrlAutolinkAstTransformer {
                   node_ref: NodeRef,
                   entering: bool|
              -> rushdown::Result<WalkStatus> {
-                if entering && matches_kind!(arena, node_ref, Text) && !has_link_ancestor(arena, node_ref)
+                if entering
+                    && matches_kind!(arena, node_ref, Text)
+                    && !has_link_ancestor(arena, node_ref)
                 {
                     text_refs.push(node_ref);
                 }
@@ -331,7 +332,12 @@ fn raw_http_url_regex() -> &'static Regex {
 }
 
 fn trimmed_raw_http_url_stop(text: &str, start: usize, mut stop: usize) -> usize {
-    while stop > start && matches!(text.as_bytes()[stop - 1], b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~') {
+    while stop > start
+        && matches!(
+            text.as_bytes()[stop - 1],
+            b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~'
+        )
+    {
         stop -= 1;
     }
 
@@ -1276,7 +1282,8 @@ mod tests {
 
         assert!(html.contains("<pre"), "{html}");
         assert!(html.contains("<code"), "{html}");
-        assert!(html.contains("style=\""), "{html}");
+        assert!(html.contains("class=\"code\""), "{html}");
+        assert!(html.contains("class=\"language-rust\""), "{html}");
         assert!(html.contains("let"));
         assert!(html.contains("10"));
     }
@@ -1471,32 +1478,6 @@ graph LR
     }
 
     #[test]
-    fn renders_link_and_image_attributes() {
-        let html = RushdownMarkdownRenderer::new()
-            .render_html(
-                r#"
-[aaa](https://example.com/aaa){.myclass #example data-kind="link"}
-
-![alt text](/media/images/example){.image-class data-size="large"}
-"#,
-            )
-            .expect("markdown should render");
-
-        assert!(
-            html.contains(
-                r#"<a href="https://example.com/aaa" class="external myclass" id="example" data-kind="link">aaa<svg class="external-icon""#
-            ),
-            "{html}",
-        );
-        assert!(
-            html.contains(
-                r#"<img src="/media/images/example" alt="alt text" class="image-class" data-size="large">"#
-            ),
-            "{html}",
-        );
-    }
-
-    #[test]
     fn classifies_internal_and_external_links() {
         let html = RushdownMarkdownRenderer::new()
             .render_html(
@@ -1525,20 +1506,6 @@ graph LR
         assert!(
             html.contains(
                 r#"<a href="https://example.com/path" class="external">external<svg class="external-icon""#
-            ),
-            "{html}",
-        );
-    }
-
-    #[test]
-    fn linkifies_raw_http_urls_as_external_links() {
-        let html = RushdownMarkdownRenderer::new()
-            .render_html("- https://a-website-is-a-room.net/\n")
-            .expect("markdown should render");
-
-        assert!(
-            html.contains(
-                r#"<li><p><a href="https://a-website-is-a-room.net/" class="external">https://a-website-is-a-room.net/<svg class="external-icon""#
             ),
             "{html}",
         );

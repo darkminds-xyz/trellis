@@ -23,6 +23,7 @@
             {{#if site.tagline}}
               <p>{{site.tagline}}</p>
             {{/if}}
+            {{> components/search}}
             <div data-theme-toggle>{{> components/theme-toggle}}</div>
           </div>
 
@@ -59,8 +60,10 @@
                 </p>
               </div>
             </header>
-            {{> taglist}}
-            <section class="page-content" data-renderer="rushdown">
+            <div class="popover-hint">
+              {{> taglist}}
+            </div>
+            <section class="page-content popover-hint" data-renderer="rushdown">
               {{{article.html}}}
             </section>
           </article>
@@ -80,6 +83,21 @@
         </main>
 
         <aside class="right sidebar">
+          {{#if article.toc.enabled}}
+            <nav class="toc" aria-label="Table of contents">
+              <button id="toc" class="toc-header" type="button" aria-label="Toggle table of contents">
+                <h3>Table of contents</h3>
+                <span class="fold" aria-hidden="true">▾</span>
+              </button>
+              <ul class="toc-content overflow">
+                {{#each article.toc.items}}
+                  <li class="depth-{{depth}}">
+                    <a href="#{{id}}" data-for="{{id}}">{{title}}</a>
+                  </li>
+                {{/each}}
+              </ul>
+            </nav>
+          {{/if}}
           {{> components/graph}}
           {{> components/backlinks}}
         </aside>
@@ -101,10 +119,10 @@
     {{#if scripts.callouts}}
       <script type="module">{{{scripts.callouts}}}</script>
     {{/if}}
-    <script type="module" src="/static/graph.js"></script>
+    <script type="module" src="/static/assets/graph.js"></script>
     {{#if scripts.mermaid}}
       <script type="module">{{{scripts.mermaid}}}</script>
     {{/if}}
-    <script type="module" src="/static/styles.js"></script>
+    <script type="module" src="/static/assets/site.js"></script>
   </body>
 </html>

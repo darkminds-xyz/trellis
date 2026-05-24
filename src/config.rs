@@ -57,6 +57,8 @@ pub struct TypographyConfig {
 pub struct SiteConfig {
     pub name: String,
     pub tagline: Option<String>,
+    pub code: CodeThemeConfig,
+    pub colors: SiteColorsConfig,
 }
 
 impl Default for SiteConfig {
@@ -64,8 +66,70 @@ impl Default for SiteConfig {
         Self {
             name: "Trellis".to_string(),
             tagline: None,
+            code: CodeThemeConfig::default(),
+            colors: SiteColorsConfig::default(),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeThemeConfig {
+    pub light: String,
+    pub dark: String,
+}
+
+impl Default for CodeThemeConfig {
+    fn default() -> Self {
+        Self {
+            light: "Github_Light".to_string(),
+            dark: "Github_Dark".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SiteColorsConfig {
+    pub light: ThemeColorsConfig,
+    pub dark: ThemeColorsConfig,
+}
+
+impl Default for SiteColorsConfig {
+    fn default() -> Self {
+        Self {
+            light: ThemeColorsConfig {
+                light: "#ffffffd1".to_string(),
+                lightgray: "#e5e5e5".to_string(),
+                gray: "#b8b8b8".to_string(),
+                darkgray: "#3b3a3a".to_string(),
+                dark: "#06070b".to_string(),
+                secondary: "#008066".to_string(),
+                tertiary: "#005042e6".to_string(),
+                highlight: "#8f9fa914".to_string(),
+            },
+            dark: ThemeColorsConfig {
+                light: "#06070b".to_string(),
+                lightgray: "#141e22".to_string(),
+                gray: "#6b6b6b".to_string(),
+                darkgray: "#d4d4d4".to_string(),
+                dark: "#ffffffd1".to_string(),
+                secondary: "#008066".to_string(),
+                tertiary: "#0fd392b3".to_string(),
+                highlight: "#191d1d96".to_string(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ThemeColorsConfig {
+    pub light: String,
+    pub lightgray: String,
+    pub gray: String,
+    pub darkgray: String,
+    pub dark: String,
+    pub secondary: String,
+    pub tertiary: String,
+    pub highlight: String,
 }
 
 impl AppConfig {
@@ -120,8 +184,38 @@ impl AppConfig {
             site: SiteConfig {
                 name: string(root, &["site", "name"]).unwrap_or(default_site.name),
                 tagline: string(root, &["site", "tagline"]),
+                code: CodeThemeConfig {
+                    light: string(root, &["site", "code", "light"])
+                        .unwrap_or(default_site.code.light),
+                    dark: string(root, &["site", "code", "dark"]).unwrap_or(default_site.code.dark),
+                },
+                colors: SiteColorsConfig {
+                    light: theme_colors(
+                        root,
+                        &["site", "colors", "lightmode"],
+                        default_site.colors.light,
+                    ),
+                    dark: theme_colors(
+                        root,
+                        &["site", "colors", "darkmode"],
+                        default_site.colors.dark,
+                    ),
+                },
             },
         })
+    }
+}
+
+fn theme_colors(root: &Yaml, path: &[&str], defaults: ThemeColorsConfig) -> ThemeColorsConfig {
+    ThemeColorsConfig {
+        light: string(root, &[path, &["light"]].concat()).unwrap_or(defaults.light),
+        lightgray: string(root, &[path, &["lightgray"]].concat()).unwrap_or(defaults.lightgray),
+        gray: string(root, &[path, &["gray"]].concat()).unwrap_or(defaults.gray),
+        darkgray: string(root, &[path, &["darkgray"]].concat()).unwrap_or(defaults.darkgray),
+        dark: string(root, &[path, &["dark"]].concat()).unwrap_or(defaults.dark),
+        secondary: string(root, &[path, &["secondary"]].concat()).unwrap_or(defaults.secondary),
+        tertiary: string(root, &[path, &["tertiary"]].concat()).unwrap_or(defaults.tertiary),
+        highlight: string(root, &[path, &["highlight"]].concat()).unwrap_or(defaults.highlight),
     }
 }
 
@@ -190,7 +284,7 @@ mod tests {
     #[test]
     fn reads_nested_config_yml_values() {
         let config = AppConfig::from_yaml_str(
-            r#"
+            r##"
 database:
   url: data/trellis.db
 admin:
@@ -206,7 +300,17 @@ typography:
 site:
   name: My Notes
   tagline: Working notes
-"#,
+  code:
+    light: Github_Light.tmTheme
+    dark: Github_Dark.tmTheme
+  colors:
+    lightmode:
+      light: "#fff"
+      secondary: "var(--custom-secondary)"
+    darkmode:
+      dark: "#eee"
+      highlight: "rgb(1 2 3 / 40%)"
+"##,
         )
         .expect("config should parse");
 
@@ -222,6 +326,17 @@ site:
         );
         assert_eq!(config.site.name, "My Notes");
         assert_eq!(config.site.tagline.as_deref(), Some("Working notes"));
+        assert_eq!(config.site.code.light, "Github_Light.tmTheme");
+        assert_eq!(config.site.code.dark, "Github_Dark.tmTheme");
+        assert_eq!(config.site.colors.light.light, "#fff");
+        assert_eq!(
+            config.site.colors.light.secondary,
+            "var(--custom-secondary)"
+        );
+        assert_eq!(config.site.colors.light.dark, "#06070b");
+        assert_eq!(config.site.colors.dark.dark, "#eee");
+        assert_eq!(config.site.colors.dark.highlight, "rgb(1 2 3 / 40%)");
+        assert_eq!(config.site.colors.dark.light, "#06070b");
     }
 
     #[test]

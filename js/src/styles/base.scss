@@ -13,35 +13,6 @@ html {
   -moz-text-size-adjust: none;
 }
 
-:root[saved-theme="dark"] {
-  --light: #06070b;
-  --lightgray: #141e22;
-  --gray: #6b6b6b;
-  --darkgray: #d4d4d4;
-  --dark: #ffffffd1;
-  --secondary: #008066;
-  --tertiary: #0fd392b3;
-  --highlight: #191d1d96;
-}
-
-:root {
-  --light: #ffffffd1;
-  --lightgray: #e5e5e5;
-  --gray: #b8b8b8;
-  --darkgray: #3b3a3a;
-  --dark: #06070b;
-  --secondary: #008066;
-  --tertiary: #005042e6;
-  --highlight: #8f9fa914;
-
-  --pm-link-color: oklch(58.8% 0.158 241.966);
-  --pm-muted-color: oklch(37.2% 0.044 257.287);
-  --pm-code-background-color: oklch(92.9% 0.013 255.508);
-  --pm-code-btn-background-color: oklch(86.9% 0.022 252.894);
-  --pm-code-btn-hover-background-color: oklch(70.4% 0.04 256.788);
-  --pm-blockquote-vertical-line-background-color: oklch(70.4% 0.04 256.788);
-}
-
 body {
   margin: 0;
   box-sizing: border-box;
@@ -721,7 +692,7 @@ tr {
   // Mirrors .cm-rendered-list-mark color while keeping native markers.
   & ul,
   & ol {
-    margin: 0 0 1rem;
+    margin: 0 0 0.5rem;
     padding-left: 2rem;
   }
 

@@ -3,6 +3,8 @@ mod config;
 mod handlers;
 mod markdown;
 mod schemas;
+mod site_styles;
+mod syntax_highlighting;
 mod typography;
 
 use log::info;

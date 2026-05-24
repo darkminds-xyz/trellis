@@ -18,6 +18,8 @@ use crate::{
     config::AppConfig,
     markdown::{MarkdownHtmlRenderer, RushdownMarkdownRenderer, title_from_markdown},
     schemas::{accounts, documents, images},
+    site_styles::site_color_css,
+    syntax_highlighting::syntax_theme_css,
     typography::Typography,
 };
 
@@ -774,6 +776,11 @@ fn admin_data(
     json!({
         "styles": "",
         "editor_styles": "",
+        "runtime_styles": format!(
+            "{}\n{}",
+            site_color_css(&config.site.colors),
+            syntax_theme_css(&config.site.code)
+        ),
         "font_css": typography.font_css,
         "fonts_href": typography.fonts_href,
         "site": {
@@ -849,7 +856,11 @@ fn render_with_styles(
 ) -> HttpResponse {
     let styles = fs::read_to_string("public/assets/admin-shell.css").unwrap_or_default();
     let editor_styles = fs::read_to_string("public/assets/editor.css").unwrap_or_default();
-    data["styles"] = json!(styles);
+    let runtime_styles = data["runtime_styles"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    data["styles"] = json!(format!("{styles}\n{runtime_styles}"));
     data["editor_styles"] = json!(editor_styles);
 
     render(hb, template, data, HttpResponseBuilder::new(status))

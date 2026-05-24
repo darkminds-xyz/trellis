@@ -16,6 +16,8 @@ use crate::{
         tags_from_markdown, title_from_markdown, toc_enabled,
     },
     schemas::documents,
+    site_styles::site_color_css,
+    syntax_highlighting::syntax_theme_css,
     typography::Typography,
 };
 
@@ -191,7 +193,11 @@ fn render_with_styles(
 ) -> HttpResponse {
     match fs::read_to_string("public/assets/site.css") {
         Ok(styles) => {
-            data["styles"] = json!(styles);
+            let runtime_styles = data["runtime_styles"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            data["styles"] = json!(format!("{styles}\n{runtime_styles}"));
             render(hb, template, data, HttpResponseBuilder::new(status))
         }
         Err(_) => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
@@ -215,6 +221,11 @@ fn page_data(
 
     json!({
         "styles": "",
+        "runtime_styles": format!(
+            "{}\n{}",
+            site_color_css(&config.site.colors),
+            syntax_theme_css(&config.site.code)
+        ),
         "font_css": typography.font_css,
         "fonts_href": typography.fonts_href,
         "site": {
