@@ -3274,15 +3274,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rushdown-definition-list"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e686456f46f9f9511dde72f66e2ff20cfd1c6140e322d6b8b379bbc04e1b4cef"
-dependencies = [
- "rushdown",
-]
-
-[[package]]
 name = "rushdown-diagram"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3309,15 +3300,6 @@ checksum = "5e957fb939ccf80c287fa24ec1a13fd13422706aebd62ed29b2ef6c14ef9cb61"
 dependencies = [
  "rushdown",
  "syntect",
-]
-
-[[package]]
-name = "rushdown-link-attribute"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b9a52dca0dc3ca08d525472f1dac51af67b5cd7e5aa3b2d00646b077ee1de5"
-dependencies = [
- "rushdown",
 ]
 
 [[package]]
@@ -4273,11 +4255,9 @@ dependencies = [
  "regex",
  "reqwest",
  "rushdown",
- "rushdown-definition-list",
  "rushdown-diagram",
  "rushdown-footnote",
  "rushdown-highlighting",
- "rushdown-link-attribute",
  "rushdown-meta",
  "serde",
  "serde_json",

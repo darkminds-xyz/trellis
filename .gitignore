@@ -5,5 +5,4 @@ trellis.db
 .env
 config.yml
 nginx/
-TMark/
-js/public/assets/
+public/assets/
