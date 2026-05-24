@@ -5,7 +5,6 @@
 
 Trellis is an open source toolchain and server that helps you publish Markdown notes as a [**digital garden**](https://medium.com/%40raysims/a-digital-garden-inventory-d6450fe74b4). Fast, opinionated, and built for long-lived knowledge rather than disposable posts. Trellis is currently pre-alpha and developing slowly, we're looking for early testers and new ideas for the digital gardens world.
 
-
 ## Trellis: Resources
 
 Learn more about Trellis:
@@ -26,3 +25,9 @@ Check them out to learn who/what inspired me to build a Rust version with a slig
 > You can't put a price tag on preparation.
 
 - Added tag page for viewing other pages with same tag.
+
+<!-- ## TODO: Code themes
+
+- https://packages.sublimetext.io/?q=label%3A%22theme%22+label%3A%22color+scheme%22
+- https://colorsublime.github.io/
+- https://www.sublimetext.com/docs/syntax.html#include-syntax -->

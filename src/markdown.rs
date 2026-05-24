@@ -1,5 +1,7 @@
 use core::{any::TypeId, fmt, marker::PhantomData};
+use std::sync::OnceLock;
 
+use regex::Regex;
 use rushdown::ast::{
     Arena, KindData, Link, LinkKind, NodeKind, NodeRef, NodeType, Paragraph, PrettyPrint, Text,
     WalkStatus, pp_indent,
@@ -13,7 +15,7 @@ use rushdown::{
     new_markdown_to_html_string,
     parser::{self, AnyAstTransformer, AstTransformer, ParserExtension, parser_extension},
     renderer::html::{self, RendererExtension, renderer_extension},
-    text::{Reader, Segment},
+    text::{Reader, Segment, Value},
     util::{EscapeUrlOptions, escape_html, escape_url},
 };
 use rushdown_diagram::{
@@ -184,15 +186,11 @@ impl RushdownMarkdownRenderer {
         rushdown_meta::meta_parser_extension(rushdown_meta::MetaParserOptions::default())
             .and(footnote_parser_extension())
             .and(diagram_parser_extension(DiagramParserOptions::default()))
+            .and(link_attribute_parser_extension())
             .and(callout_parser_extension())
             .and(parser::gfm_table())
             .and(parser::gfm_task_list_item())
-            .and(parser::gfm_linkify(parser::LinkifyOptions {
-                allowed_protocols: vec!["http".to_string(), "https".to_string()],
-                www_scanner: Box::new(|_: &[u8]| None),
-                email_scanner: Box::new(|_: &[u8]| None),
-                ..parser::LinkifyOptions::default()
-            }))
+            .and(raw_http_url_autolink_parser_extension())
     }
 
     fn renderer_extensions(&self) -> impl RendererExtension<'_> {
@@ -209,6 +207,169 @@ impl RushdownMarkdownRenderer {
             .and(callout_html_renderer_extension())
             .and(classified_link_html_renderer_extension())
     }
+}
+
+#[derive(Debug)]
+struct RawHttpUrlAutolinkAstTransformer;
+
+impl RawHttpUrlAutolinkAstTransformer {
+    fn new() -> Self {
+        Self
+    }
+}
+
+impl AstTransformer for RawHttpUrlAutolinkAstTransformer {
+    fn transform(
+        &self,
+        arena: &mut Arena,
+        doc_ref: NodeRef,
+        reader: &mut rushdown::text::BasicReader,
+        _context: &mut parser::Context,
+    ) {
+        let mut text_refs = Vec::new();
+        rushdown::ast::walk(
+            arena,
+            doc_ref,
+            &mut |arena: &Arena,
+                  node_ref: NodeRef,
+                  entering: bool|
+             -> rushdown::Result<WalkStatus> {
+                if entering && matches_kind!(arena, node_ref, Text) && !has_link_ancestor(arena, node_ref)
+                {
+                    text_refs.push(node_ref);
+                }
+                Ok(WalkStatus::Continue)
+            },
+        )
+        .unwrap();
+
+        for text_ref in text_refs {
+            autolink_raw_http_urls(arena, text_ref, reader.source());
+        }
+    }
+}
+
+impl From<RawHttpUrlAutolinkAstTransformer> for AnyAstTransformer {
+    fn from(transformer: RawHttpUrlAutolinkAstTransformer) -> Self {
+        AnyAstTransformer::Extension(Box::new(transformer))
+    }
+}
+
+fn raw_http_url_autolink_parser_extension() -> impl ParserExtension {
+    parser_extension(|parser| {
+        parser.add_ast_transformer(
+            RawHttpUrlAutolinkAstTransformer::new,
+            parser::NoParserOptions,
+            200,
+        );
+    })
+}
+
+fn autolink_raw_http_urls(arena: &mut Arena, text_ref: NodeRef, source: &str) {
+    let Some(parent_ref) = arena[text_ref].parent() else {
+        return;
+    };
+    let text = as_kind_data!(arena, text_ref, Text).str(source).to_string();
+    let source_index = as_kind_data!(arena, text_ref, Text).index().copied();
+    let matches = raw_http_url_matches(&text);
+    if matches.is_empty() {
+        return;
+    }
+
+    let mut cursor = 0;
+    for (start, stop) in matches {
+        if cursor < start {
+            let before_ref = arena.new_node(Text::new(text_value_for_range(
+                source_index,
+                &text,
+                cursor,
+                start,
+            )));
+            parent_ref.insert_before(arena, text_ref, before_ref);
+        }
+
+        let url = text_value_for_range(source_index, &text, start, stop);
+        let link_ref = arena.new_node(Link::auto(url.clone(), url));
+        let label_ref = arena.new_node(Text::new(text_value_for_range(
+            source_index,
+            &text,
+            start,
+            stop,
+        )));
+        link_ref.append_child(arena, label_ref);
+        parent_ref.insert_before(arena, text_ref, link_ref);
+        cursor = stop;
+    }
+
+    if cursor < text.len() {
+        let after_ref = arena.new_node(Text::new(text_value_for_range(
+            source_index,
+            &text,
+            cursor,
+            text.len(),
+        )));
+        parent_ref.insert_before(arena, text_ref, after_ref);
+    }
+
+    text_ref.remove(arena);
+}
+
+fn raw_http_url_matches(text: &str) -> Vec<(usize, usize)> {
+    raw_http_url_regex()
+        .find_iter(text)
+        .filter_map(|url_match| {
+            let start = url_match.start();
+            let stop = trimmed_raw_http_url_stop(text, start, url_match.end());
+            (start < stop).then_some((start, stop))
+        })
+        .collect()
+}
+
+fn raw_http_url_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r#"https?://[^\s<>"']+"#).expect("valid raw URL regex"))
+}
+
+fn trimmed_raw_http_url_stop(text: &str, start: usize, mut stop: usize) -> usize {
+    while stop > start && matches!(text.as_bytes()[stop - 1], b'?' | b'!' | b'.' | b',' | b':' | b'*' | b'_' | b'~') {
+        stop -= 1;
+    }
+
+    while stop > start && text.as_bytes()[stop - 1] == b')' {
+        let url = &text[start..stop];
+        let opens = url.bytes().filter(|byte| *byte == b'(').count();
+        let closes = url.bytes().filter(|byte| *byte == b')').count();
+        if closes <= opens {
+            break;
+        }
+        stop -= 1;
+    }
+
+    stop
+}
+
+fn text_value_for_range(
+    source_index: Option<rushdown::text::Index>,
+    text: &str,
+    start: usize,
+    stop: usize,
+) -> Value {
+    if let Some(source_index) = source_index {
+        Segment::new(source_index.start() + start, source_index.start() + stop).into()
+    } else {
+        text[start..stop].to_string().into()
+    }
+}
+
+fn has_link_ancestor(arena: &Arena, node_ref: NodeRef) -> bool {
+    let mut current_ref = arena[node_ref].parent();
+    while let Some(parent_ref) = current_ref {
+        if matches_kind!(arena, parent_ref, Link) {
+            return true;
+        }
+        current_ref = arena[parent_ref].parent();
+    }
+    false
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -960,7 +1121,7 @@ impl<W: TextWrite> RenderNode<W> for ClassifiedLinkHtmlRenderer<W> {
                 }
                 return Ok(WalkStatus::SkipChildren);
             }
-        } else {
+        } else if !matches!(link.link_kind(), LinkKind::Auto(_)) {
             if matches!(classification, LinkClassification::External) {
                 self.writer.write_safe_str(w, EXTERNAL_LINK_ICON)?;
             }
