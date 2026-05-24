@@ -1,3 +1,5 @@
+class RedirectedForAuth extends Error {}
+
 function nullableParentId(value: FormDataEntryValue | null): number | null {
   if (typeof value !== "string" || value.trim() === "") return null;
 
@@ -8,7 +10,7 @@ function nullableParentId(value: FormDataEntryValue | null): number | null {
 async function sendJson(url: string, method: string, body: unknown) {
   const response = await fetch(url, {
     method,
-    credentials: "same-origin",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -17,8 +19,8 @@ async function sendJson(url: string, method: string, body: unknown) {
   });
 
   if (response.status === 401) {
-    window.location.href = "/admin";
-    return undefined;
+    window.location.assign("/admin");
+    throw new RedirectedForAuth();
   }
 
   const payload = await response.json().catch(() => undefined);
@@ -64,8 +66,9 @@ function bootAdminForms() {
           parent_id: nullableParentId(data.get("parent_id")),
           hidden: data.get("hidden") === "on",
         });
-        window.location.reload();
+        window.location.assign("/admin/list");
       } catch (error) {
+        if (error instanceof RedirectedForAuth) return;
         window.alert(error instanceof Error ? error.message : "Unable to create folder.");
       }
     });
@@ -90,6 +93,7 @@ function bootAdminForms() {
           window.location.href = `/admin/edit/${payload.id}`;
         }
       } catch (error) {
+        if (error instanceof RedirectedForAuth) return;
         window.alert(error instanceof Error ? error.message : "Unable to create note.");
       }
     });
@@ -109,8 +113,9 @@ function bootAdminForms() {
             parent_id: nullableParentId(data.get("parent_id")),
             hidden: data.get("hidden") === "on",
           });
-          window.location.reload();
+          window.location.assign("/admin/list");
         } catch (error) {
+          if (error instanceof RedirectedForAuth) return;
           window.alert(error instanceof Error ? error.message : "Unable to save folder.");
         }
       });
@@ -131,8 +136,9 @@ function bootAdminForms() {
             parent_id: nullableParentId(data.get("parent_id")),
             draft: data.get("draft") === "on",
           });
-          window.location.reload();
+          window.location.assign("/admin/list");
         } catch (error) {
+          if (error instanceof RedirectedForAuth) return;
           window.alert(error instanceof Error ? error.message : "Unable to save note.");
         }
       });
@@ -150,7 +156,7 @@ function bootAdminForms() {
 
         const response = await fetch(`/api/admin/documents/${documentId}`, {
           method: "DELETE",
-          credentials: "same-origin",
+          credentials: "include",
           headers: { Accept: "application/json" },
         });
 
@@ -170,7 +176,7 @@ function bootAdminForms() {
           return;
         }
 
-        window.location.reload();
+        window.location.assign("/admin/list");
       });
     });
 }

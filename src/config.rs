@@ -99,19 +99,23 @@ impl AppConfig {
                 port: number_u16(root, &["server", "port"]).unwrap_or(default_server.port),
             },
             database_url: string(root, &["database_url"])
-                .or_else(|| string(root, &["database", "url"]))
-                .or_else(|| string(root, &["DATABASE_URL"])),
+                .or_else(|| string(root, &["database", "url"])),
             admin: AdminConfig {
                 username: string(root, &["admin", "username"]),
                 password: string(root, &["admin", "password"]),
                 secure_cookies: boolean(root, &["admin", "secure_cookies"]).unwrap_or(true),
             },
             typography: TypographyConfig {
-                body_font: string(root, &["typography", "body_font"]),
-                heading_font: string(root, &["typography", "heading_font"]),
-                mono_font: string(root, &["typography", "mono_font"]),
-                title_font: string(root, &["typography", "title_font"]),
-                google_fonts_href: string(root, &["typography", "google_fonts_href"]),
+                body_font: string(root, &["typography", "body_font"])
+                    .or_else(|| string(root, &["typography", "body"])),
+                heading_font: string(root, &["typography", "heading_font"])
+                    .or_else(|| string(root, &["typography", "heading"])),
+                mono_font: string(root, &["typography", "mono_font"])
+                    .or_else(|| string(root, &["typography", "mono"])),
+                title_font: string(root, &["typography", "title_font"])
+                    .or_else(|| string(root, &["typography", "title"])),
+                google_fonts_href: string(root, &["typography", "google_fonts_href"])
+                    .or_else(|| string(root, &["typography", "href"])),
             },
             site: SiteConfig {
                 name: string(root, &["site", "name"]).unwrap_or(default_site.name),
@@ -218,5 +222,35 @@ site:
         );
         assert_eq!(config.site.name, "My Notes");
         assert_eq!(config.site.tagline.as_deref(), Some("Working notes"));
+    }
+
+    #[test]
+    fn reads_short_typography_config_keys() {
+        let config = AppConfig::from_yaml_str(
+            r#"
+typography:
+  href: https://fonts.example.test/short.css
+  body: Lato
+  heading: Questrial
+  mono: "JetBrains Mono"
+  title: "Zilla Slab Highlight"
+"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(config.typography.body_font.as_deref(), Some("Lato"));
+        assert_eq!(config.typography.heading_font.as_deref(), Some("Questrial"));
+        assert_eq!(
+            config.typography.mono_font.as_deref(),
+            Some("JetBrains Mono")
+        );
+        assert_eq!(
+            config.typography.title_font.as_deref(),
+            Some("Zilla Slab Highlight")
+        );
+        assert_eq!(
+            config.typography.google_fonts_href.as_deref(),
+            Some("https://fonts.example.test/short.css")
+        );
     }
 }

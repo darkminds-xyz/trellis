@@ -2,6 +2,7 @@ use sqlx::{FromRow, SqlitePool};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentErrorKind {
+    DuplicateName,
     FolderNotEmpty,
     InvalidDocumentKind,
     InvalidParent,
@@ -15,11 +16,25 @@ pub enum DocumentError {
 
 impl From<sqlx::Error> for DocumentError {
     fn from(err: sqlx::Error) -> Self {
+        if is_duplicate_name_error(&err) {
+            return Self::Domain(DocumentErrorKind::DuplicateName);
+        }
+
         Self::Sqlx(err)
     }
 }
 
 pub type DocumentResult<T> = Result<T, DocumentError>;
+
+fn is_duplicate_name_error(err: &sqlx::Error) -> bool {
+    err.as_database_error().is_some_and(|err| {
+        let message = err.message();
+        message.contains("idx_documents_unique_root_name")
+            || message.contains("idx_documents_unique_child_name")
+            || message.contains("UNIQUE constraint failed: documents.name")
+            || message.contains("UNIQUE constraint failed: documents.parent_id, documents.name")
+    })
+}
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredDocument {

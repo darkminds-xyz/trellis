@@ -3293,15 +3293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rushdown-fenced-div"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96e4a9226d8b89fa706a6015d661782cfc5e46772c047f3ca24249e068b21e5"
-dependencies = [
- "rushdown",
-]
-
-[[package]]
 name = "rushdown-footnote"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4284,7 +4275,6 @@ dependencies = [
  "rushdown",
  "rushdown-definition-list",
  "rushdown-diagram",
- "rushdown-fenced-div",
  "rushdown-footnote",
  "rushdown-highlighting",
  "rushdown-link-attribute",

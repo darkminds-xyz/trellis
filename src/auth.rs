@@ -125,50 +125,84 @@ impl AdminSessions {
             .finish())
     }
 
+    pub fn clear_session_cookie_variants(&self) -> Vec<Cookie<'static>> {
+        ["/", "/admin", "/admin/list", "/api", "/api/admin"]
+            .into_iter()
+            .map(|path| {
+                Cookie::build(ADMIN_SESSION_COOKIE, "")
+                    .path(path)
+                    .http_only(true)
+                    .secure(self.secure_cookies)
+                    .same_site(SameSite::Strict)
+                    .max_age(Duration::seconds(0))
+                    .finish()
+            })
+            .collect()
+    }
+
     pub async fn is_authenticated(&self, req: &HttpRequest) -> bool {
-        let Some(cookie) = req.cookie(ADMIN_SESSION_COOKIE) else {
+        let tokens = admin_session_cookie_values(req);
+        if tokens.is_empty() {
             return false;
-        };
+        }
 
         let now = OffsetDateTime::now_utc();
         if prune_expired_sessions(&self.pool, now).await.is_err() {
             return false;
         }
 
-        sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM admin_sessions
-            WHERE token = ?1 AND expires_at > ?2
-            "#,
-        )
-        .bind(cookie.value())
-        .bind(now.unix_timestamp())
-        .fetch_one(&self.pool)
-        .await
-        .map(|count| count > 0)
-        .unwrap_or(false)
+        for token in tokens {
+            let is_valid = sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT COUNT(*)
+                FROM admin_sessions
+                WHERE token = ?1 AND expires_at > ?2
+                "#,
+            )
+            .bind(token)
+            .bind(now.unix_timestamp())
+            .fetch_one(&self.pool)
+            .await
+            .map(|count| count > 0)
+            .unwrap_or(false);
+
+            if is_valid {
+                return true;
+            }
+        }
+
+        false
     }
 
     pub async fn clear_session_cookie(&self, req: &HttpRequest) -> Cookie<'static> {
         let now = OffsetDateTime::now_utc();
 
         let _ = prune_expired_sessions(&self.pool, now).await;
-        if let Some(cookie) = req.cookie(ADMIN_SESSION_COOKIE) {
+        let tokens = admin_session_cookie_values(req);
+        for token in tokens {
             let _ = sqlx::query("DELETE FROM admin_sessions WHERE token = ?1")
-                .bind(cookie.value())
+                .bind(token)
                 .execute(&self.pool)
                 .await;
         }
 
-        Cookie::build(ADMIN_SESSION_COOKIE, "")
-            .path("/")
-            .http_only(true)
-            .secure(self.secure_cookies)
-            .same_site(SameSite::Strict)
-            .max_age(Duration::seconds(0))
-            .finish()
+        self.clear_session_cookie_variants()
+            .into_iter()
+            .next()
+            .expect("session cookie variants include root path")
     }
+}
+
+fn admin_session_cookie_values(req: &HttpRequest) -> Vec<String> {
+    req.cookies()
+        .map(|cookies| {
+            cookies
+                .iter()
+                .filter(|cookie| cookie.name() == ADMIN_SESSION_COOKIE)
+                .map(|cookie| cookie.value().to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 async fn prune_expired_sessions(pool: &SqlitePool, now: OffsetDateTime) -> sqlx::Result<()> {
@@ -225,6 +259,18 @@ mod tests {
         let reloaded_sessions = AdminSessions::new(sessions.pool.clone(), true);
 
         assert!(reloaded_sessions.is_authenticated(&req).await);
+    }
+
+    #[actix_web::test]
+    async fn duplicate_session_cookies_authenticate_when_any_token_is_valid() {
+        let sessions = test_sessions().await;
+        let valid_cookie = sessions.create_session_cookie().await.unwrap();
+        let req = actix_web::test::TestRequest::default()
+            .cookie(Cookie::new(ADMIN_SESSION_COOKIE, "stale-session"))
+            .cookie(valid_cookie)
+            .to_http_request();
+
+        assert!(sessions.is_authenticated(&req).await);
     }
 
     #[actix_web::test]

@@ -34,7 +34,8 @@ export function initTheme() {
 }
 
 export function mountThemeToggle(target: HTMLElement = document.body) {
-  const button = document.getElementById("theme-toggle") as HTMLButtonElement;
+  const button = target.querySelector<HTMLButtonElement>(".theme-toggle");
+  if (!button) return null;
 
   const syncButtonState = () => {
     const dark = currentTheme() === "dark";

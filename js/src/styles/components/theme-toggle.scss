@@ -1,0 +1,82 @@
+.theme-toggle {
+  --size: 2rem;
+  width: var(--size);
+  height: var(--size);
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--highlight);
+  color: var(--darkgray);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    color: var(--secondary);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 3px;
+  }
+
+  svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    overflow: visible;
+  }
+}
+
+.sun,
+.moon,
+.rays {
+  transform-origin: center;
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s ease;
+}
+
+.rays {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.sun {
+  fill: currentColor;
+  transform: scale(1);
+  opacity: 1;
+}
+
+.moon {
+  fill: currentColor;
+  transform: translateX(14px) scale(0.35) rotate(45deg);
+  opacity: 0;
+}
+
+:root[saved-theme="dark"] .theme-toggle {
+  background: color-mix(in srgb, var(--lightgray) 72%, transparent);
+}
+
+:root[saved-theme="dark"] .sun {
+  transform: scale(0.35) rotate(-45deg);
+  opacity: 0;
+}
+
+:root[saved-theme="dark"] .rays {
+  transform: scale(0.3) rotate(-90deg);
+  opacity: 0;
+}
+
+:root[saved-theme="dark"] .moon {
+  transform: translateX(0) scale(1) rotate(0deg);
+  opacity: 1;
+}

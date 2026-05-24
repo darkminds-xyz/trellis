@@ -9,6 +9,8 @@ html {
   text-size-adjust: none;
   overflow-x: hidden;
   width: 100vw;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
 }
 
 :root[saved-theme="dark"] {
@@ -159,8 +161,10 @@ a {
   }
 
   &.external .external-icon {
+    display: inline-block;
     height: 1ex;
     margin: 0 0.15em;
+    vertical-align: 0.05em;
 
     > path {
       fill: var(--dark);
@@ -445,6 +449,9 @@ input[type="checkbox"] {
 }
 
 blockquote {
+  display: block;
+  margin-block: 1em;
+  margin-inline: 40px;
   margin: 1rem 0;
   border-left: 3px solid var(--secondary);
   padding-left: 1rem;
@@ -653,7 +660,7 @@ tr {
 
 .page-content[data-renderer="rushdown"] {
   box-sizing: border-box;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1.6rem;
 
   & > * {
@@ -662,7 +669,7 @@ tr {
 
   & p {
     margin: 1rem 0 1rem;
-    line-height: normal;
+    line-height: 1.6rem;
   }
 
   & h1,
@@ -697,7 +704,7 @@ tr {
   }
 
   // Mirrors .cm-rendered-link and markdownTags.linkURL.
-  & a:not(.internal) {
+  & a:not(.internal):not(.external) {
     color: var(--pm-link-color);
     font-weight: inherit;
     text-decoration: underline;
@@ -705,34 +712,10 @@ tr {
 
   // Mirrors .cm-blockquote-line.
   & blockquote {
-    position: relative;
-    margin: 0 0 1rem;
-    padding-left: 1.1rem;
-    border-left: 0;
-    line-height: normal;
-  }
-
-  & blockquote::before {
-    content: "";
-    display: block;
-    border-left: solid 0.3em var(--pm-blockquote-vertical-line-background-color);
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    inset-inline-start: 6px;
-    z-index: -10;
-  }
-
-  & blockquote > :first-child {
-    margin-top: 0;
-  }
-
-  & blockquote > :last-child {
-    margin-bottom: 0;
-  }
-
-  & blockquote p:empty {
-    display: none;
+    border-left: 3px solid var(--secondary);
+    margin: 1rem 0;
+    padding-left: 1rem;
+    transition: border-color 0.2s;
   }
 
   // Mirrors .cm-rendered-list-mark color while keeping native markers.
@@ -884,4 +867,9 @@ iframe.pdf {
   background: var(--secondary);
   transition: width 0.2s ease;
   z-index: 9999;
+}
+
+.footnote-ref {
+  font-size: 11px;
+  color: var(--darkgray);
 }

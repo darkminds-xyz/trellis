@@ -191,20 +191,25 @@ pub async fn login(
         Err(_) => return HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    HttpResponse::SeeOther()
-        .insert_header((header::LOCATION, next))
-        .cookie(session_cookie)
-        .finish()
+    let mut response = HttpResponse::SeeOther();
+    response.insert_header((header::LOCATION, next));
+    for cookie in sessions.clear_session_cookie_variants() {
+        response.cookie(cookie);
+    }
+    response.cookie(session_cookie).finish()
 }
 
 #[post("/admin/logout")]
 pub async fn logout(req: HttpRequest, sessions: web::Data<AdminSessions>) -> impl Responder {
     let clear_cookie = sessions.clear_session_cookie(&req).await;
 
-    HttpResponse::SeeOther()
-        .insert_header((header::LOCATION, "/admin"))
-        .cookie(clear_cookie)
-        .finish()
+    let mut response = HttpResponse::SeeOther();
+    response.insert_header((header::LOCATION, "/admin"));
+    response.cookie(clear_cookie);
+    for cookie in sessions.clear_session_cookie_variants() {
+        response.cookie(cookie);
+    }
+    response.finish()
 }
 
 #[post("/admin/edit/{post_id}")]
@@ -977,6 +982,12 @@ fn document_node_json(document: &documents::DocumentNode) -> serde_json::Value {
 
 fn document_error_response(err: documents::DocumentError) -> HttpResponse {
     match err {
+        documents::DocumentError::Domain(documents::DocumentErrorKind::DuplicateName) => {
+            HttpResponse::Conflict().json(json!({
+                "error": "duplicate_name",
+                "message": "A document with that name already exists in this folder.",
+            }))
+        }
         documents::DocumentError::Domain(documents::DocumentErrorKind::FolderNotEmpty) => {
             HttpResponse::Conflict().json(json!({
                 "error": "folder_not_empty",

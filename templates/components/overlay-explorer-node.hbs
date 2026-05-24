@@ -1,0 +1,43 @@
+{{#if is_folder}}
+  <li>
+    <div
+      class="ol-folder-entry"
+      data-ol-selector-for="{{folder_path}}"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="12"
+        height="12"
+        viewBox="5 8 14 8"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="ol-folder-icon"
+      >
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+      <button class="ol-folder-button" type="button">
+        <span class="ol-folder-title">{{title}}</span>
+      </button>
+    </div>
+    <div
+      class="ol-folder-outer{{#if open}} open{{/if}}"
+      data-ol-children-for="{{folder_path}}"
+    >
+      <ul style="padding-left: 1.4rem">
+        {{#each children}}
+          {{> components/overlay-explorer-node}}
+        {{/each}}
+      </ul>
+    </div>
+  </li>
+{{else}}
+  <li>
+    <a
+      href="/{{path}}"
+      {{#if active}}aria-current="page"{{/if}}
+    >{{title}}</a>
+  </li>
+{{/if}}

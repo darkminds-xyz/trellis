@@ -230,7 +230,7 @@ fn page_data(
         "nav": nav,
         "explorer": {
             "id": "explorer",
-            "title": "Notes",
+            "title": "Xplorer",
             "use_saved_state": "true",
             "folder_click_behavior": "link",
             "folder_default_state": "collapsed",
@@ -290,18 +290,64 @@ fn content_index_entry(
 }
 
 fn nav_from_documents(context: &PublicDocuments, active_id: Option<i64>) -> Vec<serde_json::Value> {
-    context
+    nav_children(context, None, active_id)
+}
+
+fn nav_children(
+    context: &PublicDocuments,
+    parent_id: Option<i64>,
+    active_id: Option<i64>,
+) -> Vec<serde_json::Value> {
+    let mut folders = context
+        .folders_by_id
+        .values()
+        .filter(|folder| folder.parent_id == parent_id && !folder.hidden && !folder.draft)
+        .collect::<Vec<_>>();
+    folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    let mut items = Vec::new();
+    for folder in folders {
+        let children = nav_children(context, Some(folder.id), active_id);
+        let open = children.iter().any(|child| {
+            child
+                .get("active")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || child.get("open").and_then(Value::as_bool).unwrap_or(false)
+        });
+        let path = context.folder_slug(folder.id);
+        items.push(json!({
+            "is_folder": true,
+            "title": folder.title.as_deref().unwrap_or(&folder.name),
+            "path": path,
+            "folder_path": path,
+            "open": open,
+            "children": children,
+        }));
+    }
+
+    let mut documents = context
         .documents
         .iter()
-        .map(|document| {
-            let slug = context.slug_for(document).unwrap_or_default();
-            json!({
-                "title": document_title(document),
-                "path": if slug == "index" { String::new() } else { slug },
-                "active": Some(document.id) == active_id,
-            })
-        })
-        .collect()
+        .filter(|document| document.parent_id == parent_id)
+        .collect::<Vec<_>>();
+    documents.sort_by(|a, b| {
+        document_title(a)
+            .to_lowercase()
+            .cmp(&document_title(b).to_lowercase())
+    });
+
+    for document in documents {
+        let slug = context.slug_for(document).unwrap_or_default();
+        items.push(json!({
+            "is_folder": false,
+            "title": document_title(document),
+            "path": if slug == "index" { String::new() } else { slug },
+            "active": Some(document.id) == active_id,
+        }));
+    }
+
+    items
 }
 
 fn document_title(document: &documents::StoredDocument) -> String {
@@ -374,6 +420,10 @@ impl PublicDocuments {
         }
         parts.reverse();
         parts
+    }
+
+    fn folder_slug(&self, folder_id: i64) -> String {
+        self.folder_parts(Some(folder_id)).join("/")
     }
 }
 

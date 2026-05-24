@@ -5,9 +5,11 @@
   border: 1px solid var(--border);
   background-color: var(--bg);
   border-radius: 5px;
+  margin-bottom: 1rem;
   padding: 0 0.75rem;
   overflow-y: hidden;
   box-sizing: border-box;
+  padding-bottom: 1rem;
 
   & > .callout-content {
     display: grid;
@@ -119,6 +121,8 @@
   }
 
   &.is-collapsed {
+    padding-bottom: 0;
+
     & > .callout-title > .fold-callout-icon {
       transform: rotateZ(-90deg);
     }
@@ -152,6 +156,10 @@
   --icon-size: 18px;
 
   & .fold-callout-icon {
+    margin-top: 0.25rem;
+    appearance: none;
+    border: 0;
+    margin: 0;
     transition: transform 0.15s ease;
     opacity: 0.8;
     cursor: pointer;
@@ -161,6 +169,10 @@
   & > .callout-title-inner > p {
     color: var(--color);
     margin: 0;
+  }
+
+  .fold-callout-icon {
+    margin-top: 0.25rem;
   }
 
   .callout-icon,
@@ -183,4 +195,8 @@
   .callout-title-inner {
     font-weight: $semiBoldWeight;
   }
+}
+
+.page-content[data-renderer="rushdown"] .callout p {
+  margin: 0;
 }
