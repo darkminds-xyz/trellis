@@ -39,12 +39,24 @@
   height: 100vh;
   backdrop-filter: blur(4px);
   background: color-mix(in srgb, var(--light) 30%, rgba(0, 0, 0, 0.35));
-  display: none;
   z-index: 1200;
   overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    visibility 180ms ease;
 
   &.active {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    #overlay-explorer-content {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
@@ -68,6 +80,24 @@
   box-shadow: 0 14px 50px rgba(27, 33, 48, 0.12), 0 10px 30px rgba(27, 33, 48, 0.16);
   padding: 0.8rem 1rem;
   box-sizing: border-box;
+  opacity: 0;
+  transform: translateY(-0.75rem);
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+.overlay-explorer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+
+  & h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
 }
 
 #overlay-explorer-ul {
@@ -79,6 +109,12 @@
   & a {
     color: var(--dark);
     opacity: 0.8;
+
+    &.active,
+    &[aria-current="page"] {
+      color: var(--tertiary);
+      opacity: 1;
+    }
   }
 
   & li {
@@ -91,6 +127,7 @@
   align-items: center;
   gap: 0.4rem;
   user-select: none;
+  min-height: 1.65rem;
 }
 
 .ol-folder-icon {
@@ -132,11 +169,13 @@
 .ol-folder-outer {
   display: grid;
   grid-template-rows: 0fr;
+  visibility: hidden;
   transition: grid-template-rows 0.3s ease-in-out;
 }
 
 .ol-folder-outer.open {
   grid-template-rows: 1fr;
+  visibility: visible;
 }
 
 .ol-folder-outer > ul {
@@ -147,13 +186,23 @@
 }
 
 .overlay-explorer-close {
-  position: absolute;
-  right: 18px;
-  top: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
   background: transparent;
-  border: none;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
   cursor: pointer;
   color: var(--darkgray);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--secondary);
+    border-color: var(--secondary);
+  }
 }
 
 @media all and not ($mobile) {

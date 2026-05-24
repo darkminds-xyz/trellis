@@ -1,3 +1,5 @@
+import { registerCleanup } from "../utils/cleanup";
+
 type FolderState = {
   path: string;
   collapsed: boolean;
@@ -8,14 +10,6 @@ type ExplorerOptions = {
   folderDefaultState: "collapsed" | "open";
   useSavedState: boolean;
 };
-
-const registerCleanup: ((fn: () => void) => void) | null =
-  typeof window !== "undefined" &&
-  typeof (window as typeof window & { addCleanup?: (fn: () => void) => void })
-    .addCleanup === "function"
-    ? (window as typeof window & { addCleanup: (fn: () => void) => void })
-        .addCleanup
-    : null;
 
 let currentExplorerState: FolderState[] = [];
 

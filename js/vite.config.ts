@@ -26,29 +26,56 @@ const lezerPackages = [
 ];
 
 export default defineConfig({
-  resolve: {
-    dedupe: [...codeMirrorPackages, ...lezerPackages],
-    alias: Object.fromEntries([
-      ...[...codeMirrorPackages, ...lezerPackages].map((name) => [
-        name,
-        modulePath(name),
-      ]),
-      ["@prosemark/core", modulePath("@tmark/core")],
-    ]),
-  },
   build: {
-    outDir: "public/assets",
+    outDir: "../public/",
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         admin: "src/admin.ts",
+        "admin-shell": "src/admin-shell.ts",
         editor: "src/editor.ts",
         graph: "src/graph.ts",
-        styles: "src/styles.ts",
+        site: "src/site.ts",
       },
       output: {
-        entryFileNames: "[name].js",
-        assetFileNames: "[name][extname]",
+        entryFileNames: "assets/[name].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name][extname]",
+        codeSplitting: {
+          groups: [
+            {
+              name: "codemirror-view",
+              test: /node_modules[\\/](@codemirror[\\/]view|style-mod|w3c-keyname|crelt)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "codemirror-state",
+              test: /node_modules[\\/]@codemirror[\\/]state[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "codemirror-language",
+              test: /node_modules[\\/](@codemirror[\\/]language|@lezer[\\/](common|highlight|lr))[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "codemirror-markdown",
+              test: /node_modules[\\/](@codemirror[/]lang-markdown|@lezer[\\/]markdown)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "codemirror-editor",
+              test: /node_modules[\\/](@codemirror[\\/](autocomplete|commands|lint|search)|codemirror)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "shared-vendor",
+              test: /node_modules/,
+              entriesAware: true,
+              priority: 1,
+            },
+          ],
+        },
       },
     },
   },

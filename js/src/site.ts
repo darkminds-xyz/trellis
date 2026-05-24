@@ -1,6 +1,4 @@
-import "./styles/base.scss";
-import "./styles/custom.scss";
-import "./styles/components/search.scss";
+import "./styles/site.scss";
 import "./scripts/xplorer.inline";
 import { initCallouts } from "./scripts/callouts";
 import { initClipboardButtons } from "./scripts/clipboard.inline";
@@ -20,17 +18,7 @@ function bootThemeToggle() {
   });
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    bootThemeToggle();
-    initOverlayExplorer();
-    initSiteSearch();
-    initPopovers();
-    initCallouts();
-    initClipboardButtons();
-    initToc();
-  });
-} else {
+function bootSite() {
   bootThemeToggle();
   initOverlayExplorer();
   initSiteSearch();
@@ -38,6 +26,12 @@ if (document.readyState === "loading") {
   initCallouts();
   initClipboardButtons();
   initToc();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootSite);
+} else {
+  bootSite();
 }
 
 document.addEventListener("nav", () => {

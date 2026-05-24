@@ -19,10 +19,16 @@
     "vite": "^8.0.0-beta.13"
   },
   "dependencies": {
-    "@tmark/table": "file:../TMark/packages/table",
-    "@tmark/core": "file:../TMark/packages/core",
-    "@tmark/latex": "file:../TMark/packages/latex",
-    "@tmark/paste-rich-text": "file:../TMark/packages/paste-rich-text",
-    "@tmark/render-html": "file:../TMark/packages/render-html"
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/lint": "^6.9.6",
+    "@codemirror/search": "^6.7.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@lezer/markdown": "^1.6.3",
+    "@types/node": "^25.9.1"
   }
 }

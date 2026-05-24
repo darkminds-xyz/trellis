@@ -322,7 +322,7 @@ a {
     & .page-header {
       display: grid;
       grid-area: grid-header;
-      margin: 0 0 1rem 0;
+      margin: 0 0 0.75rem;
       row-gap: 0.6rem;
       align-items: start;
       @media all and ($mobile) {
@@ -668,7 +668,7 @@ tr {
   }
 
   & p {
-    margin: 1rem 0 1rem;
+    margin: 0.25rem 0;
     line-height: 1.6rem;
   }
 
@@ -681,7 +681,7 @@ tr {
     font-family: var(--headerFont);
     font-weight: $boldWeight;
     line-height: normal;
-    margin: 0 0 1rem;
+    margin: 0 0 0.5rem;
   }
 
   // Mirrors Prosemark headingTagStyles.
@@ -792,7 +792,7 @@ p > img + em {
 
 hr {
   width: 100%;
-  margin: 2rem auto;
+  margin: 1.25rem auto;
   height: 1px;
   border: none;
   background-color: var(--lightgray);
