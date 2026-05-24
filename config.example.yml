@@ -20,3 +20,26 @@ typography:
 site:
   name: Trellis
   tagline:
+  code:
+    light: "Github_Light.tmTheme"
+    dark: "Github_Dark.tmTheme"
+
+  colors:
+    lightmode:
+      light: "#ffffffd1"
+      lightgray: "#e5e5e5"
+      gray: "#b8b8b8"
+      darkgray: "#3b3a3a"
+      dark: "#06070b"
+      secondary: "#008066"
+      tertiary: "#005042e6"
+      highlight: "#8f9fa914"
+    darkmode:
+      light: "#06070b"
+      lightgray: "#141e22"
+      gray: "#6b6b6b"
+      darkgray: "#d4d4d4"
+      dark: "#ffffffd1"
+      secondary: "#008066"
+      tertiary: "#0fd392b3"
+      highlight: "#191d1d96"
